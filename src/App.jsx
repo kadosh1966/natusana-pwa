@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Heart, Flame, Coins, CheckCircle2, XCircle, Award, ShoppingBag,
-  MapPin, Share2, RefreshCw, ChevronRight, Lock, Unlock, UserCheck,
-  Sparkles, BookOpen, ShieldCheck, ArrowRight, RotateCcw, Copy, Check,
-  Gift, Trophy, Cloud, Download, Users
+  Heart, Flame, Coins, Award, ShoppingBag, RefreshCw, Sparkles,
+  ArrowRight, Gift, Trophy, Cloud, Download, Eye, EyeOff, LogOut,
+  UserPlus, LogIn, Sprout, ArrowLeft
 } from 'lucide-react';
 
 const SUPABASE_URL = 'https://yxpcctelsoqtsvtcczbc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_edcInk7TUTAxp9VjxvU0rg_e4_pCemG';
+const STORAGE_KEY = 'natusana_active_session_v1';
 
 const supabaseRequest = async (endpoint, options = {}) => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
@@ -177,17 +177,6 @@ const FALLBACK_QUESTIONS = [
     commercial_tip: 'Justifica el precio al cliente: "Con el citrato tu cuerpo aprovecha casi todo el mineral; con presentaciones genéricas la mayor parte se elimina".'
   },
   {
-    id: 'CIT-003',
-    specialty_id: 'citratos',
-    dynamic_type: 'D6',
-    statement: 'Un cliente deportista sufre de calambres frecuentes tras entrenar. Para un equilibrio electrolítico intracelular completo, ¿con qué otro mineral se recomienda combinar el Citrato de Magnesio?',
-    correct_answer: 'Citrato de potasio',
-    distractor_pool_category: 'minerales',
-    feedback_correct: '¡Gran recomendación! La bomba sodio-potasio celular depende críticamente del magnesio para funcionar. Forman el dúo perfecto contra calambres.',
-    feedback_error: 'El potasio trabaja en sinergia directa con el magnesio dentro de la célula muscular.',
-    commercial_tip: 'Si un cliente lleva magnesio por calambres intensos, ofrécele el dúo con Citrato de Potasio.'
-  },
-  {
     id: 'ADP-001',
     specialty_id: 'adaptogenos',
     dynamic_type: 'D3',
@@ -243,20 +232,37 @@ function shuffleArray(arr) {
 }
 
 export default function App() {
-  const [screen, setScreen] = useState('P2');
+  // 'P1' = Onboarding, 'P2' = Home/Ruta, 'P3' = Pregunta, 'P5' = Resumen
+  const [screen, setScreen] = useState('P1');
+  // Subvistas de P1: 'welcome' | 'register' | 'login'
+  const [authView, setAuthView] = useState('welcome');
   const [activeTab, setActiveTab] = useState('ruta');
 
-  const [userName, setUserName] = useState('Juan Jimenez');
-  const [userRole, setUserRole] = useState('tendero');
-  const [storeCode, setStoreCode] = useState('QALI-LIMA-04');
-  const [xp, setXp] = useState(470);
-  const [streak, setStreak] = useState(4);
+  // Estado de sesión de usuario
+  const [userId, setUserId] = useState(null);
+  const [isGuest, setIsGuest] = useState(true);
+  const [userName, setUserName] = useState('Visitante');
+  const [userEmail, setUserEmail] = useState('');
+  const [userRole, setUserRole] = useState('consumidor');
+  const [storeCode, setStoreCode] = useState('');
+  const [xp, setXp] = useState(0);
+  const [streak, setStreak] = useState(1);
   const [lives, setLives] = useState(5);
 
+  // Campos de formularios de Registro / Login
+  const [formAlias, setFormAlias] = useState('');
+  const [formEmail, setFormEmail] = useState('');
+  const [formPassword, setFormPassword] = useState('');
+  const [formRole, setFormRole] = useState('consumidor');
+  const [formStoreCode, setFormStoreCode] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+
   const [completedSpecs, setCompletedSpecs] = useState({
-    citratos: true,
+    citratos: false,
     adaptogenos: false,
-    superalimentos: true,
+    superalimentos: false,
     digestivo: false,
     articular: false
   });
@@ -274,9 +280,41 @@ export default function App() {
   const [optionsOnScreen, setOptionsOnScreen] = useState([]);
   const [shuffleCounter, setShuffleCounter] = useState(0);
   const [feedbackState, setFeedbackState] = useState(null);
-  const [correctCountInLesson, setCorrectCountInLesson] = useState(0);
-  const [copiedTip, setCopiedTip] = useState(false);
-  const [selectedCertSpec, setSelectedCertSpec] = useState('superalimentos');
+  const [selectedCertSpec, setSelectedCertSpec] = useState('citratos');
+
+  // 1. Verificar si hay sesión activa guardada al abrir la app
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.active) {
+          setUserId(parsed.id || null);
+          setIsGuest(Boolean(parsed.isGuest));
+          setUserName(parsed.alias || 'Visitante');
+          setUserEmail(parsed.email || '');
+          setUserRole(parsed.role || 'consumidor');
+          setStoreCode(parsed.store_code || '');
+          setXp(typeof parsed.xp_total === 'number' ? parsed.xp_total : 0);
+          setStreak(parsed.streak_days || 1);
+          setLives(parsed.lives || 5);
+          // Usuario con sesión activa -> Entra directamente al Home (P2)
+          setScreen('P2');
+        }
+      }
+    } catch (e) {
+      console.error('Error leyendo sesión local:', e);
+    }
+    fetchCloudData();
+  }, []);
+
+  const saveLocalSession = (sessionData) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ active: true, ...sessionData }));
+    } catch (e) {
+      console.error('No se pudo guardar sesión local', e);
+    }
+  };
 
   const fetchCloudData = async () => {
     try {
@@ -303,85 +341,260 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
-    fetchCloudData();
-  }, []);
+  // Opción 2: Explorar sin registrarme (Visitante entra directo al Home sin obstáculos)
+  const handleExploreAsGuest = () => {
+    setIsGuest(true);
+    setUserId(null);
+    setUserName('Visitante');
+    setUserRole('consumidor');
+    setStoreCode('');
+    setScreen('P2');
+    setActiveTab('ruta');
+  };
+
+  // Opción 1: Crear mi cuenta (Alias + Correo + Contraseña + Rol)
+  const handleRegisterSubmit = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+
+    const cleanAlias = formAlias.trim();
+    const cleanEmail = formEmail.trim().toLowerCase();
+    const cleanPass = formPassword.trim();
+    const cleanStore = formRole === 'tendero' ? (formStoreCode.trim().toUpperCase() || 'TIENDA-ALIADA') : 'FREE';
+
+    if (!cleanAlias || !cleanEmail || !cleanPass) {
+      setAuthError('Por favor completa tu alias, correo y contraseña.');
+      return;
+    }
+    if (cleanPass.length < 4) {
+      setAuthError('La contraseña debe tener al menos 4 caracteres.');
+      return;
+    }
+
+    setAuthLoading(true);
+    try {
+      // Verificar si el correo ya existe
+      const existingEmail = await supabaseRequest(`users?email=eq.${encodeURIComponent(cleanEmail)}&select=*`);
+      if (existingEmail && existingEmail.length > 0) {
+        setAuthError('Este correo ya está registrado. Usa "¿Ya tienes cuenta? Inicia sesión".');
+        setAuthLoading(false);
+        return;
+      }
+
+      // Conservar XP si el visitante ya había ganado puntos jugando antes de registrarse
+      const initialXp = xp > 0 ? xp : 50;
+
+      const inserted = await supabaseRequest('users', {
+        method: 'POST',
+        headers: { 'Prefer': 'return=representation' },
+        body: JSON.stringify({
+          alias: cleanAlias,
+          email: cleanEmail,
+          password: cleanPass,
+          role: formRole,
+          store_code: cleanStore,
+          xp_total: initialXp,
+          streak_days: 1,
+          lives: 5
+        })
+      });
+
+      const createdUser = inserted && inserted[0] ? inserted[0] : {
+        id: null,
+        alias: cleanAlias,
+        email: cleanEmail,
+        role: formRole,
+        store_code: cleanStore,
+        xp_total: initialXp,
+        streak_days: 1,
+        lives: 5
+      };
+
+      setUserId(createdUser.id);
+      setIsGuest(false);
+      setUserName(createdUser.alias);
+      setUserEmail(createdUser.email);
+      setUserRole(createdUser.role);
+      setStoreCode(createdUser.store_code);
+      setXp(createdUser.xp_total);
+      setStreak(createdUser.streak_days || 1);
+      setLives(createdUser.lives || 5);
+
+      saveLocalSession({
+        id: createdUser.id,
+        isGuest: false,
+        alias: createdUser.alias,
+        email: createdUser.email,
+        role: createdUser.role,
+        store_code: createdUser.store_code,
+        xp_total: createdUser.xp_total,
+        streak_days: createdUser.streak_days || 1,
+        lives: createdUser.lives || 5
+      });
+
+      await fetchCloudData();
+      setScreen('P2');
+      setActiveTab('ruta');
+    } catch (err) {
+      setAuthError(`No se pudo crear la cuenta: ${err.message}`);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // Opción 3: Iniciar sesión (Correo + Contraseña)
+  const handleLoginSubmit = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+
+    const cleanEmail = formEmail.trim().toLowerCase();
+    const cleanPass = formPassword.trim();
+
+    if (!cleanEmail || !cleanPass) {
+      setAuthError('Ingresa tu correo electrónico y tu contraseña.');
+      return;
+    }
+
+    setAuthLoading(true);
+    try {
+      const found = await supabaseRequest(
+        `users?email=eq.${encodeURIComponent(cleanEmail)}&select=*`
+      );
+
+      if (!found || found.length === 0) {
+        setAuthError('No encontramos una cuenta con ese correo electrónico.');
+        setAuthLoading(false);
+        return;
+      }
+
+      const userRecord = found[0];
+      if (userRecord.password && userRecord.password !== cleanPass) {
+        setAuthError('Contraseña incorrecta. Verifica e intenta nuevamente.');
+        setAuthLoading(false);
+        return;
+      }
+
+      setUserId(userRecord.id);
+      setIsGuest(false);
+      setUserName(userRecord.alias);
+      setUserEmail(userRecord.email);
+      setUserRole(userRecord.role || 'consumidor');
+      setStoreCode(userRecord.store_code || 'FREE');
+      setXp(userRecord.xp_total || 0);
+      setStreak(userRecord.streak_days || 1);
+      setLives(userRecord.lives || 5);
+
+      saveLocalSession({
+        id: userRecord.id,
+        isGuest: false,
+        alias: userRecord.alias,
+        email: userRecord.email,
+        role: userRecord.role || 'consumidor',
+        store_code: userRecord.store_code || 'FREE',
+        xp_total: userRecord.xp_total || 0,
+        streak_days: userRecord.streak_days || 1,
+        lives: userRecord.lives || 5
+      });
+
+      // Cargar especialidades certificadas del usuario
+      if (userRecord.id) {
+        const prog = await supabaseRequest(`user_progress?user_id=eq.${userRecord.id}&select=*`);
+        if (prog && prog.length > 0) {
+          const mapSpecs = { citratos: false, adaptogenos: false, superalimentos: false, digestivo: false, articular: false };
+          prog.forEach(p => {
+            if (p.certified) mapSpecs[p.specialty_id] = true;
+          });
+          setCompletedSpecs(mapSpecs);
+        }
+      }
+
+      setScreen('P2');
+      setActiveTab('ruta');
+    } catch (err) {
+      setAuthError(`Error al iniciar sesión: ${err.message}`);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // Cerrar sesión -> Regresa a la pantalla de Bienvenida (P1) con sesión cerrada
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {}
+    setUserId(null);
+    setIsGuest(true);
+    setUserName('Visitante');
+    setUserEmail('');
+    setFormEmail('');
+    setFormPassword('');
+    setAuthError('');
+    setAuthView('welcome');
+    setScreen('P1');
+  };
 
   const syncUserToSupabase = async (newXp = xp, specCompleted = null) => {
+    if (isGuest) {
+      setSyncMessage('💡 Estás en modo visitante. Crea tu cuenta para guardar tu progreso en la nube.');
+      setTimeout(() => setSyncMessage(''), 5000);
+      return;
+    }
+
     setIsSaving(true);
-    setSyncMessage('Guardando en Supabase...');
+    setSyncMessage('Sincronizando con Supabase...');
     try {
-      const cleanAlias = (userName || 'Asesor NatuSana').trim();
-      const existing = await supabaseRequest(`users?alias=eq.${encodeURIComponent(cleanAlias)}&select=*`);
+      let currentUserId = userId;
 
-      let currentUserId = null;
-
-      if (existing && existing.length > 0) {
-        currentUserId = existing[0].id;
+      if (currentUserId) {
         await supabaseRequest(`users?id=eq.${currentUserId}`, {
           method: 'PATCH',
           body: JSON.stringify({
             xp_total: newXp,
             streak_days: streak,
-            lives: lives,
-            role: userRole,
-            store_code: storeCode || 'FREE'
-          })
-        });
-      } else {
-        const inserted = await supabaseRequest('users', {
-          method: 'POST',
-          headers: { 'Prefer': 'return=representation' },
-          body: JSON.stringify({
-            alias: cleanAlias,
-            role: userRole,
-            store_code: storeCode || 'FREE',
-            xp_total: newXp,
-            streak_days: streak,
             lives: lives
           })
         });
-        if (inserted && inserted[0]) currentUserId = inserted[0].id;
       }
 
-      if (currentUserId) {
-        const specsToSave = specCompleted
-          ? [specCompleted]
-          : Object.keys(completedSpecs).filter(k => completedSpecs[k]);
-
-        for (const sId of specsToSave) {
-          const prog = await supabaseRequest(`user_progress?user_id=eq.${currentUserId}&specialty_id=eq.${sId}&select=*`);
-          if (!prog || prog.length === 0) {
-            await supabaseRequest('user_progress', {
-              method: 'POST',
-              body: JSON.stringify({
-                user_id: currentUserId,
-                specialty_id: sId,
-                completed_modules: 4,
-                certified: true,
-                certification_date: new Date().toISOString()
-              })
-            });
-          }
+      if (currentUserId && specCompleted) {
+        const prog = await supabaseRequest(`user_progress?user_id=eq.${currentUserId}&specialty_id=eq.${specCompleted}&select=*`);
+        if (!prog || prog.length === 0) {
+          await supabaseRequest('user_progress', {
+            method: 'POST',
+            body: JSON.stringify({
+              user_id: currentUserId,
+              specialty_id: specCompleted,
+              completed_modules: 4,
+              certified: true,
+              certification_date: new Date().toISOString()
+            })
+          });
         }
       }
+
+      saveLocalSession({
+        id: currentUserId,
+        isGuest: false,
+        alias: userName,
+        email: userEmail,
+        role: userRole,
+        store_code: storeCode,
+        xp_total: newXp,
+        streak_days: streak,
+        lives: lives
+      });
 
       const updatedUsers = await supabaseRequest('users?select=*&order=xp_total.desc&limit=15');
       if (updatedUsers) setLeaderboard(updatedUsers);
 
-      setSyncMessage(`✅ Guardado en Supabase: "${cleanAlias}" (${newXp} XP)`);
-      setTimeout(() => setSyncMessage(''), 6000);
+      setSyncMessage(`✅ Progreso guardado en tu cuenta (${newXp} XP)`);
+      setTimeout(() => setSyncMessage(''), 4000);
     } catch (e) {
-      setSyncMessage(`⚠️ Error al guardar: ${e.message}`);
+      setSyncMessage(`⚠️ Error al sincronizar: ${e.message}`);
     } finally {
       setIsSaving(false);
     }
   };
-
-  const currentSpec = useMemo(
-    () => SPECIALTIES.find(s => s.id === currentSpecId) || SPECIALTIES[0],
-    [currentSpecId]
-  );
 
   const specQuestions = useMemo(
     () => dbQuestions.filter(q => q.specialty_id === currentSpecId),
@@ -412,7 +625,6 @@ export default function App() {
   const startSpecialtyLesson = (specId) => {
     setCurrentSpecId(specId);
     setQIndex(0);
-    setCorrectCountInLesson(0);
     setFeedbackState(null);
     setScreen('P3');
   };
@@ -422,7 +634,6 @@ export default function App() {
     const isRight = selectedOption === currentQ.correct_answer;
     if (isRight) {
       setFeedbackState('correct');
-      setCorrectCountInLesson(c => c + 1);
       setXp(x => x + 25);
     } else {
       setFeedbackState('wrong');
@@ -467,11 +678,11 @@ export default function App() {
 
     ctx.fillStyle = '#111827';
     ctx.font = 'bold 58px sans-serif';
-    ctx.fillText(userName || 'Juan Jimenez', 600, 330);
+    ctx.fillText(userName || 'Estudiante NatuSana', 600, 330);
 
     ctx.fillStyle = '#059669';
     ctx.font = 'bold 26px sans-serif';
-    ctx.fillText(`Local Afiliado: ${storeCode || 'FREE'}  |  Puntaje Acumulado: ${xp} XP`, 600, 395);
+    ctx.fillText(`Local Afiliado: ${storeCode || 'CONSUMIDOR'}  |  Puntaje: ${xp} XP`, 600, 395);
 
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(140, 445, 920, 150);
@@ -498,25 +709,323 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-start py-2 px-2 font-sans select-none">
-      <div className="w-full max-w-md mb-2 px-3 py-2 rounded-2xl bg-slate-800/95 border border-slate-700 flex items-center justify-between text-xs text-slate-300">
+    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-start py-3 px-2 font-sans select-none">
+      {/* Barra superior informativa de estado */}
+      <div className="w-full max-w-md mb-2 px-3.5 py-2 rounded-2xl bg-slate-800/95 border border-slate-700 flex items-center justify-between text-xs text-slate-300">
         <div className="flex items-center gap-2">
           <span className={`w-2.5 h-2.5 rounded-full ${dbStatus === 'online' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-          <span className="font-bold text-white">NatuSana PWA</span>
+          <span className="font-bold text-white">NatuSana</span>
           <span className="text-[11px] text-emerald-300 font-semibold">
-            {dbStatus === 'online' ? '• Supabase Conectado' : '• Modo Local'}
+            {isGuest ? '• Modo Visitante' : `• ${userName}`}
           </span>
         </div>
-        <button
-          onClick={() => setScreen('P1')}
-          className="px-2.5 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-[11px] font-bold text-emerald-300 transition"
-        >
-          👤 {userName} ({storeCode || 'FREE'})
-        </button>
+
+        {screen !== 'P1' && (
+          isGuest ? (
+            <button
+              onClick={() => { setAuthView('register'); setScreen('P1'); }}
+              className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-[11px] font-bold text-white transition flex items-center gap-1"
+            >
+              <UserPlus className="w-3 h-3" /> Crear cuenta
+            </button>
+          ) : (
+            <button
+              onClick={handleLogout}
+              className="px-2.5 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-[11px] font-bold text-slate-200 transition flex items-center gap-1"
+            >
+              <LogOut className="w-3 h-3" /> Salir
+            </button>
+          )
+        )}
       </div>
 
+      {/* Contenedor Principal Móvil */}
       <div className="w-full max-w-md bg-[#F9FAFB] rounded-[32px] shadow-2xl border-4 border-slate-800 overflow-hidden flex flex-col">
-        {screen !== 'P3' && (
+
+        {/* ===================================================================== */}
+        {/* PANTALLA P1: ONBOARDING DE 3 VISTAS (BIENVENIDA / REGISTRO / LOGIN)    */}
+        {/* ===================================================================== */}
+        {screen === 'P1' && (
+          <div className="p-6 sm:p-8 min-h-[540px] flex flex-col justify-center bg-[#F4F6F4]">
+            {authView === 'welcome' && (
+              <div className="flex flex-col items-center text-center my-auto">
+                {/* Logo NatuSana */}
+                <div className="flex flex-col items-center mb-8">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center mb-2 shadow-sm">
+                    <Sprout className="w-9 h-9 text-[#1E9E49] stroke-[2.2]" />
+                  </div>
+                  <span className="text-3xl font-extrabold text-[#1C1E21] tracking-tight">
+                    NatuSana
+                  </span>
+                </div>
+
+                {/* Título y Subtítulo de tu Imagen 1 */}
+                <h1 className="text-2xl sm:text-[28px] font-extrabold text-[#1C1E21] leading-tight mb-3">
+                  ¡Bienvenido a NatuSana!
+                </h1>
+                <p className="text-sm sm:text-base text-[#606770] max-w-xs leading-relaxed mb-8">
+                  Aprende sobre salud natural con lecciones cortas y trivias divertidas.
+                </p>
+
+                {/* Botón Primario: Crear mi cuenta */}
+                <button
+                  onClick={() => { setAuthError(''); setAuthView('register'); }}
+                  className="w-full py-3.5 px-6 rounded-xl bg-[#259D4A] hover:bg-[#1f873f] active:translate-y-0.5 text-white font-bold text-base shadow-sm transition mb-3.5"
+                >
+                  Crear mi cuenta
+                </button>
+
+                {/* Botón Secundario: Explorar sin registrarme */}
+                <button
+                  onClick={handleExploreAsGuest}
+                  className="w-full py-3.5 px-6 rounded-xl bg-white hover:bg-emerald-50/50 text-[#1C1E21] font-bold text-base border border-[#259D4A] transition mb-6"
+                >
+                  Explorar sin registrarme
+                </button>
+
+                {/* Enlace Inferior: ¿Ya tienes cuenta? Inicia sesión */}
+                <p className="text-sm text-[#606770]">
+                  ¿Ya tienes cuenta?{' '}
+                  <button
+                    onClick={() => { setAuthError(''); setAuthView('login'); }}
+                    className="font-bold text-[#1C1E21] hover:text-[#259D4A] underline-offset-2 hover:underline"
+                  >
+                    Inicia sesión
+                  </button>
+                </p>
+              </div>
+            )}
+
+            {/* VISTA B: FORMULARIO CREAR MI CUENTA (OPCIÓN CLÁSICA + ALIAS) */}
+            {authView === 'register' && (
+              <div className="my-auto">
+                <button
+                  onClick={() => setAuthView('welcome')}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 mb-4"
+                >
+                  <ArrowLeft className="w-4 h-4" /> Volver a bienvenida
+                </button>
+
+                <div className="flex items-center gap-2 mb-1">
+                  <Sprout className="w-6 h-6 text-[#259D4A]" />
+                  <h2 className="text-2xl font-extrabold text-slate-900">Crear mi cuenta</h2>
+                </div>
+                <p className="text-xs text-slate-600 mb-5">
+                  Guarda tu racha, descarga tus certificados y acumula puntos XP.
+                </p>
+
+                {authError && (
+                  <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-xs font-bold text-red-700">
+                    {authError}
+                  </div>
+                )}
+
+                <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Alias o Nombre (para tu Diploma y Ranking)
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. María Gómez o Carlos_Bio"
+                      value={formAlias}
+                      onChange={e => setFormAlias(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#259D4A]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Correo electrónico
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="tucorreo@ejemplo.com"
+                      value={formEmail}
+                      onChange={e => setFormEmail(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#259D4A]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Contraseña
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        placeholder="Mínimo 4 caracteres"
+                        value={formPassword}
+                        onChange={e => setFormPassword(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-800 pr-10 focus:outline-none focus:border-[#259D4A]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Selector de Perfil: Consumidor vs Asesor de Tienda */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      ¿Cómo usarás NatuSana?
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormRole('consumidor')}
+                        className={`py-2.5 px-2 rounded-xl text-xs font-bold border transition ${
+                          formRole === 'consumidor'
+                            ? 'bg-emerald-50 border-[#259D4A] text-[#1f873f]'
+                            : 'bg-white border-slate-300 text-slate-600'
+                        }`}
+                      >
+                        🌱 Consumidor
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormRole('tendero')}
+                        className={`py-2.5 px-2 rounded-xl text-xs font-bold border transition ${
+                          formRole === 'tendero'
+                            ? 'bg-emerald-50 border-[#259D4A] text-[#1f873f]'
+                            : 'bg-white border-slate-300 text-slate-600'
+                        }`}
+                      >
+                        🏪 Asesor / Tienda
+                      </button>
+                    </div>
+                  </div>
+
+                  {formRole === 'tendero' && (
+                    <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200">
+                      <label className="block text-[11px] font-extrabold text-emerald-900 uppercase mb-1">
+                        Código de Tienda Aliada / Equipo Qali Kay
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej. QALI-LIMA-04"
+                        value={formStoreCode}
+                        onChange={e => setFormStoreCode(e.target.value.toUpperCase())}
+                        className="w-full px-3 py-2 rounded-lg border border-emerald-300 bg-white text-xs font-mono font-bold text-emerald-900 uppercase"
+                      />
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={authLoading}
+                    className="w-full py-3.5 px-6 rounded-xl bg-[#259D4A] hover:bg-[#1f873f] text-white font-bold text-sm shadow-sm transition mt-2"
+                  >
+                    {authLoading ? 'Creando cuenta...' : 'Registrarme y entrar al Home'}
+                  </button>
+                </form>
+
+                <p className="text-xs text-center text-slate-600 mt-4">
+                  ¿Ya tienes cuenta?{' '}
+                  <button
+                    onClick={() => { setAuthError(''); setAuthView('login'); }}
+                    className="font-bold text-slate-900 hover:text-[#259D4A] underline"
+                  >
+                    Inicia sesión
+                  </button>
+                </p>
+              </div>
+            )}
+
+            {/* VISTA C: FORMULARIO INICIAR SESIÓN */}
+            {authView === 'login' && (
+              <div className="my-auto">
+                <button
+                  onClick={() => setAuthView('welcome')}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 mb-4"
+                >
+                  <ArrowLeft className="w-4 h-4" /> Volver a bienvenida
+                </button>
+
+                <div className="flex items-center gap-2 mb-1">
+                  <LogIn className="w-6 h-6 text-[#259D4A]" />
+                  <h2 className="text-2xl font-extrabold text-slate-900">Inicia sesión</h2>
+                </div>
+                <p className="text-xs text-slate-600 mb-5">
+                  Ingresa con tu correo y contraseña para recuperar tu progreso.
+                </p>
+
+                {authError && (
+                  <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-xs font-bold text-red-700">
+                    {authError}
+                  </div>
+                )}
+
+                <form onSubmit={handleLoginSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Correo electrónico
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="tucorreo@ejemplo.com"
+                      value={formEmail}
+                      onChange={e => setFormEmail(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#259D4A]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Contraseña
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        placeholder="Tu contraseña"
+                        value={formPassword}
+                        onChange={e => setFormPassword(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-800 pr-10 focus:outline-none focus:border-[#259D4A]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={authLoading}
+                    className="w-full py-3.5 px-6 rounded-xl bg-[#259D4A] hover:bg-[#1f873f] text-white font-bold text-sm shadow-sm transition"
+                  >
+                    {authLoading ? 'Verificando...' : 'Entrar a mi cuenta'}
+                  </button>
+                </form>
+
+                <p className="text-xs text-center text-slate-600 mt-5">
+                  ¿Aún no tienes cuenta?{' '}
+                  <button
+                    onClick={() => { setAuthError(''); setAuthView('register'); }}
+                    className="font-bold text-slate-900 hover:text-[#259D4A] underline"
+                  >
+                    Crear mi cuenta
+                  </button>
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Barra de Estadísticas y Navegación en el Home (P2 y P5) */}
+        {screen !== 'P1' && screen !== 'P3' && (
           <div className="bg-white border-b border-slate-200 sticky top-0 z-30">
             <div className="px-3 py-2.5 flex items-center justify-between border-b border-slate-100">
               <div className="flex items-center gap-1.5 bg-red-50 px-2.5 py-1 rounded-xl border border-red-100">
@@ -531,14 +1040,23 @@ export default function App() {
                 <Coins className="w-4 h-4 text-amber-500" />
                 <span className="font-extrabold text-amber-700 text-xs">{xp} XP</span>
               </div>
-              <button
-                onClick={() => syncUserToSupabase(xp)}
-                disabled={isSaving}
-                className="text-[11px] font-extrabold px-2.5 py-1 rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 shadow-sm flex items-center gap-1"
-              >
-                <Cloud className="w-3.5 h-3.5" />
-                {isSaving ? '...' : 'Guardar DB'}
-              </button>
+              {isGuest ? (
+                <button
+                  onClick={() => { setAuthView('register'); setScreen('P1'); }}
+                  className="text-[11px] font-extrabold px-2.5 py-1 rounded-xl bg-[#259D4A] text-white hover:bg-[#1f873f] shadow-sm"
+                >
+                  Guardar cuenta
+                </button>
+              ) : (
+                <button
+                  onClick={() => syncUserToSupabase(xp)}
+                  disabled={isSaving}
+                  className="text-[11px] font-extrabold px-2.5 py-1 rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 shadow-sm flex items-center gap-1"
+                >
+                  <Cloud className="w-3.5 h-3.5" />
+                  {isSaving ? '...' : 'Sincronizar'}
+                </button>
+              )}
             </div>
 
             <div className="grid grid-cols-4 gap-1 px-2 py-1.5 bg-slate-50">
@@ -568,7 +1086,7 @@ export default function App() {
 
               <button
                 onClick={() => { setScreen('P2'); setActiveTab('premios'); }}
-                className={`py-2 px-1 rounded-xl flex flex-col items-center gap-0.5 transition relative ${
+                className={`py-2 px-1 rounded-xl flex flex-col items-center gap-0.5 transition ${
                   screen === 'P2' && activeTab === 'premios'
                     ? 'bg-amber-500 text-white shadow-sm'
                     : 'bg-amber-50/80 text-amber-800 border border-amber-200 hover:bg-amber-100'
@@ -599,219 +1117,22 @@ export default function App() {
           </div>
         )}
 
-        {screen === 'P1' && (
-          <div className="p-5 flex flex-col justify-between bg-gradient-to-b from-emerald-50/70 to-white">
-            <div>
-              <div className="text-center mb-4">
-                <span className="text-xs font-extrabold uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">
-                  Perfil y Tienda Aliada
-                </span>
-                <h1 className="text-2xl font-black text-slate-800 mt-2">
-                  Natu<span className="text-emerald-600">Sana</span>
-                </h1>
-              </div>
-
-              <div className="p-4 rounded-2xl border-2 border-emerald-500 bg-white shadow-sm mb-4">
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                  Nombre para tus Certificados y Ranking
-                </label>
-                <input
-                  type="text"
-                  value={userName}
-                  onChange={e => setUserName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-bold text-slate-800 mb-3"
-                />
-
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-                  Código de Tienda Aliada o Equipo Qali Kay
-                </label>
-                <input
-                  type="text"
-                  value={storeCode}
-                  onChange={e => setStoreCode(e.target.value.toUpperCase())}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-mono font-bold text-emerald-800 uppercase mb-3"
-                />
-
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => setUserRole('tendero')}
-                    className={`py-2 rounded-xl text-xs font-bold border ${
-                      userRole === 'tendero'
-                        ? 'bg-emerald-600 text-white border-emerald-700'
-                        : 'bg-slate-50 text-slate-600 border-slate-200'
-                    }`}
-                  >
-                    🏪 Rol: Tendero B2B
-                  </button>
-                  <button
-                    onClick={() => setUserRole('consumidor')}
-                    className={`py-2 rounded-xl text-xs font-bold border ${
-                      userRole === 'consumidor'
-                        ? 'bg-amber-500 text-white border-amber-600'
-                        : 'bg-slate-50 text-slate-600 border-slate-200'
-                    }`}
-                  >
-                    🌱 Rol: Consumidor
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={() => {
-                syncUserToSupabase(xp);
-                setScreen('P2');
-                setActiveTab('ruta');
-              }}
-              className="w-full py-3.5 px-6 rounded-2xl bg-emerald-500 border-b-4 border-emerald-700 text-white font-extrabold text-sm tracking-wide uppercase flex items-center justify-center gap-2"
-            >
-              Guardar en Supabase y Volver <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
+        {/* ===================================================================== */}
+        {/* PANTALLA P2: HOME (RUTA, DIPLOMAS, PREMIOS B2B, VITRINA)              */}
+        {/* ===================================================================== */}
         {screen === 'P2' && (
           <div className="p-4">
-            {activeTab === 'premios' && (
-              <div className="space-y-4">
-                <div className="bg-gradient-to-r from-amber-500 to-amber-600 rounded-2xl p-4 text-white shadow-md">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 px-2.5 py-0.5 rounded-full">
-                      Programa B2B Qali Kay
-                    </span>
-                    <span className="text-xs font-extrabold">Tienda: {storeCode || 'FREE'}</span>
-                  </div>
-                  <h2 className="text-lg font-black mt-1">Premios B2B y Ranking en Vivo</h2>
-                  <p className="text-xs text-amber-100 mt-0.5">
-                    Tus puntos XP desbloquean beneficios reales para ti y tu tienda aliada.
-                  </p>
-                  <div className="mt-3 pt-2.5 border-t border-white/20 flex items-center justify-between">
-                    <div>
-                      <p className="text-[11px] uppercase font-bold text-amber-100">Tu saldo actual</p>
-                      <p className="text-2xl font-black">{xp} XP</p>
-                    </div>
-                    <button
-                      onClick={() => syncUserToSupabase(xp)}
-                      disabled={isSaving}
-                      className="px-3 py-2 rounded-xl bg-white text-amber-700 font-extrabold text-xs shadow hover:bg-amber-50 transition flex items-center gap-1.5"
-                    >
-                      <Cloud className="w-4 h-4" />
-                      {isSaving ? 'Sincronizando...' : `Guardar a ${userName} en Supabase`}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-2.5">
-                  <h3 className="text-xs font-extrabold uppercase text-slate-500 tracking-wider">
-                    Catálogo de Recompensas para Tiendas
-                  </h3>
-
-                  {[
-                    {
-                      xpReq: 300,
-                      title: 'Pack de Muestras Gratis Qali Kay',
-                      desc: 'Sachets de Citrato de Magnesio y Camu Camu para degustación del dependiente.',
-                      icon: '🎁'
-                    },
-                    {
-                      xpReq: 500,
-                      title: 'Bono 5% de Descuento en Reposición B2B',
-                      desc: 'Aplicable a la siguiente factura de la tienda aliada en las líneas certificadas.',
-                      icon: '📦'
-                    },
-                    {
-                      xpReq: 800,
-                      title: 'Placa Física "Punto de Venta Certificado"',
-                      desc: 'Exhibidor acrílico oficial + prioridad en el directorio web de tiendas.',
-                      icon: '🏆'
-                    }
-                  ].map((reward, i) => {
-                    const unlocked = xp >= reward.xpReq;
-                    return (
-                      <div
-                        key={i}
-                        className={`p-3.5 rounded-2xl border-2 bg-white flex items-start gap-3 ${
-                          unlocked ? 'border-emerald-400' : 'border-slate-200 opacity-80'
-                        }`}
-                      >
-                        <div className="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-xl shrink-0">
-                          {reward.icon}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[11px] font-extrabold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md">
-                              Meta: {reward.xpReq} XP
-                            </span>
-                            {unlocked ? (
-                              <span className="text-[11px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                                ✅ Desbloqueado
-                              </span>
-                            ) : (
-                              <span className="text-[11px] font-bold text-slate-400">
-                                Faltan {reward.xpReq - xp} XP
-                              </span>
-                            )}
-                          </div>
-                          <h4 className="font-extrabold text-slate-800 text-sm mt-1">{reward.title}</h4>
-                          <p className="text-xs text-slate-600 mt-0.5">{reward.desc}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="bg-white rounded-2xl border-2 border-slate-200 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <Trophy className="w-4 h-4 text-amber-500" />
-                      <h3 className="text-xs font-extrabold uppercase text-slate-700">
-                        Tabla `users` en tu Supabase (En Vivo)
-                      </h3>
-                    </div>
-                    <button
-                      onClick={fetchCloudData}
-                      className="text-xs text-emerald-600 font-bold flex items-center gap-1 hover:underline"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" /> Actualizar
-                    </button>
-                  </div>
-
-                  {leaderboard.length === 0 ? (
-                    <div className="text-center py-4 bg-slate-50 rounded-xl border border-dashed border-slate-300 p-3">
-                      <p className="text-xs text-slate-600 font-bold mb-2">
-                        Tu tabla `users` en Supabase aún está vacía.
-                      </p>
-                      <button
-                        onClick={() => syncUserToSupabase(xp)}
-                        className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-extrabold shadow hover:bg-emerald-500"
-                      >
-                        ⚡ Insertar a {userName} ({xp} XP) en Supabase Ahora
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {leaderboard.map((u, idx) => (
-                        <div
-                          key={u.id || idx}
-                          className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs"
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <span className="w-6 h-6 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center text-[11px]">
-                              {idx + 1}
-                            </span>
-                            <div>
-                              <p className="font-extrabold text-slate-800">{u.alias}</p>
-                              <p className="text-[10px] text-slate-500 font-mono">
-                                Tienda: {u.store_code || 'FREE'} • Rol: {u.role}
-                              </p>
-                            </div>
-                          </div>
-                          <span className="font-black text-amber-600 text-sm">{u.xp_total} XP</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+            {isGuest && (
+              <div className="mb-3 p-3 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between gap-2">
+                <p className="text-xs text-amber-900 font-semibold">
+                  👋 Estás explorando sin registro. Crea tu cuenta gratis para no perder tus puntos XP.
+                </p>
+                <button
+                  onClick={() => { setAuthView('register'); setScreen('P1'); }}
+                  className="px-3 py-1.5 rounded-xl bg-[#259D4A] text-white font-extrabold text-xs shrink-0"
+                >
+                  Crear cuenta
+                </button>
               </div>
             )}
 
@@ -820,19 +1141,13 @@ export default function App() {
                 <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-4 text-white mb-4 shadow-md flex items-center justify-between">
                   <div>
                     <span className="text-[10px] uppercase tracking-wider font-extrabold bg-white/20 px-2 py-0.5 rounded-md">
-                      TIENDA: {storeCode || 'INDEPENDIENTE'}
+                      {isGuest ? 'MODO EXPLORACIÓN' : `LOCAL: ${storeCode || 'CONSUMIDOR'}`}
                     </span>
                     <h2 className="text-lg font-extrabold mt-1">¡Hola, {userName}!</h2>
                     <p className="text-xs text-emerald-100">
-                      Toca cualquier especialidad para jugar o ve a "3. Premios B2B".
+                      Selecciona una especialidad para comenzar tu trivia.
                     </p>
                   </div>
-                  <button
-                    onClick={() => setActiveTab('premios')}
-                    className="px-3 py-2 rounded-xl bg-amber-400 text-slate-900 font-black text-xs shadow hover:bg-amber-300 shrink-0"
-                  >
-                    🎁 Ver Premios
-                  </button>
                 </div>
 
                 <div className="relative flex flex-col items-center space-y-3">
@@ -882,6 +1197,62 @@ export default function App() {
               </div>
             )}
 
+            {activeTab === 'premios' && (
+              <div className="space-y-4">
+                <div className="bg-gradient-to-r from-amber-500 to-amber-600 rounded-2xl p-4 text-white shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 px-2.5 py-0.5 rounded-full">
+                      Programa B2B Qali Kay
+                    </span>
+                    <span className="text-xs font-extrabold">Tienda: {storeCode || 'CONSUMIDOR'}</span>
+                  </div>
+                  <h2 className="text-lg font-black mt-1">Premios B2B y Ranking en Vivo</h2>
+                  <p className="text-xs text-amber-100 mt-0.5">
+                    Tus puntos XP desbloquean beneficios para ti y tu tienda aliada.
+                  </p>
+                </div>
+
+                <div className="bg-white rounded-2xl border-2 border-slate-200 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Trophy className="w-4 h-4 text-amber-500" />
+                      <h3 className="text-xs font-extrabold uppercase text-slate-700">
+                        Ranking Oficial en Vivo
+                      </h3>
+                    </div>
+                    <button
+                      onClick={fetchCloudData}
+                      className="text-xs text-emerald-600 font-bold flex items-center gap-1 hover:underline"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" /> Actualizar
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {leaderboard.map((u, idx) => (
+                      <div
+                        key={u.id || idx}
+                        className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span className="w-6 h-6 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center text-[11px]">
+                            {idx + 1}
+                          </span>
+                          <div>
+                            <p className="font-extrabold text-slate-800">{u.alias}</p>
+                            <p className="text-[10px] text-slate-500 font-mono">
+                              Local: {u.store_code || 'FREE'}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="font-black text-amber-600 text-sm">{u.xp_total} XP</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {activeTab === 'diplomas' && (
               <div className="space-y-4">
                 {(() => {
@@ -889,18 +1260,12 @@ export default function App() {
                   return (
                     <div className="bg-white rounded-3xl border-2 border-emerald-500 p-5 shadow-md text-center">
                       <div className="flex items-center justify-center gap-2 text-emerald-700 font-black text-xs uppercase">
-                        <span>🌿 Certificación Oficial NatuSana • Respaldado por Qali Kay</span>
+                        <span>🌿 Certificación Oficial NatuSana</span>
                       </div>
                       <p className="text-[11px] text-slate-400 uppercase font-bold mt-3">Otorgado a:</p>
                       <h4 className="text-2xl font-black text-slate-800">{userName}</h4>
-                      <span className="inline-block mt-1 text-[11px] font-bold px-3 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                        Local Afiliado: {storeCode || 'FREE'}
-                      </span>
                       <div className="my-3 p-3 rounded-2xl bg-emerald-50 border border-emerald-200">
-                        <p className="text-[10px] uppercase font-extrabold text-emerald-700">
-                          Título Acreditado:
-                        </p>
-                        <p className="text-sm font-black text-slate-800 mt-0.5">
+                        <p className="text-sm font-black text-slate-800">
                           {specObj.certificateTitle}
                         </p>
                       </div>
@@ -913,28 +1278,6 @@ export default function App() {
                     </div>
                   );
                 })()}
-
-                <div className="space-y-2">
-                  {SPECIALTIES.map(spec => (
-                    <div
-                      key={spec.id}
-                      onClick={() => setSelectedCertSpec(spec.id)}
-                      className={`p-3 rounded-2xl border-2 flex items-center gap-3 cursor-pointer transition ${
-                        selectedCertSpec === spec.id
-                          ? 'bg-emerald-50 border-emerald-500'
-                          : 'bg-white border-slate-200'
-                      }`}
-                    >
-                      <span className="text-xl">{spec.icon}</span>
-                      <div className="flex-1">
-                        <p className="text-xs font-extrabold text-slate-800">{spec.certificateTitle}</p>
-                        <p className="text-[11px] text-emerald-700 font-semibold">
-                          Toca para previsualizar y descargar arriba
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
             )}
 
@@ -959,6 +1302,9 @@ export default function App() {
           </div>
         )}
 
+        {/* ===================================================================== */}
+        {/* PANTALLA P3: PREGUNTA ACTIVA                                          */}
+        {/* ===================================================================== */}
         {screen === 'P3' && currentQ && (
           <div className="flex flex-col justify-between p-4 bg-[#F9FAFB] relative min-h-[540px]">
             <div>
@@ -989,7 +1335,7 @@ export default function App() {
                     onClick={() => setShuffleCounter(c => c + 1)}
                     className="text-[11px] font-bold text-slate-600 hover:text-emerald-700 flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-sm"
                   >
-                    <RefreshCw className="w-3 h-3" /> Barajar Pool (22+)
+                    <RefreshCw className="w-3 h-3" /> Barajar opciones
                   </button>
                 )}
               </div>
@@ -1061,7 +1407,7 @@ export default function App() {
                 </p>
                 <div className="p-2.5 rounded-xl bg-white/90 border border-slate-200/80 mb-3">
                   <p className="text-[10px] font-extrabold uppercase text-emerald-700">
-                    💡 Tip Comercial de Mostrador Qali Kay
+                    💡 Tip Comercial Qali Kay
                   </p>
                   <p className="text-xs font-medium text-slate-800">{currentQ.commercial_tip}</p>
                 </div>
@@ -1076,31 +1422,54 @@ export default function App() {
           </div>
         )}
 
+        {/* ===================================================================== */}
+        {/* PANTALLA P5: RESUMEN DE MÓDULO                                        */}
+        {/* ===================================================================== */}
         {screen === 'P5' && (
           <div className="p-6 flex flex-col justify-between text-center">
             <div>
               <div className="text-4xl mb-2">🌟🌟🌟</div>
-              <h2 className="text-2xl font-black text-slate-800">¡Módulo Completado!</h2>
+              <h2 className="text-2xl font-black text-slate-800">¡Lección Completada!</h2>
               <p className="text-xs text-emerald-700 font-bold mt-1">
-                Tu progreso y puntos XP ya fueron guardados en Supabase.
+                {isGuest
+                  ? 'Crea tu cuenta gratis para guardar estos puntos XP en la nube.'
+                  : 'Tus puntos XP ya fueron sincronizados en tu cuenta.'}
               </p>
               <div className="grid grid-cols-2 gap-3 my-5">
                 <div className="bg-white p-3 rounded-2xl border-2 border-emerald-200">
-                  <p className="text-xs font-bold text-slate-400 uppercase">XP Total</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase">XP Acumulado</p>
                   <p className="text-2xl font-black text-emerald-600">{xp} XP</p>
                 </div>
                 <div className="bg-white p-3 rounded-2xl border-2 border-amber-200">
-                  <p className="text-xs font-bold text-slate-400 uppercase">Tienda</p>
-                  <p className="text-lg font-black text-amber-600">{storeCode || 'FREE'}</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase">Perfil</p>
+                  <p className="text-base font-black text-amber-600 truncate">{userName}</p>
                 </div>
               </div>
             </div>
-            <button
-              onClick={() => { setScreen('P2'); setActiveTab('premios'); }}
-              className="w-full py-4 px-6 rounded-2xl bg-amber-500 border-b-4 border-amber-700 text-white font-extrabold text-sm uppercase"
-            >
-              Ver Mi Ranking y Premios B2B
-            </button>
+
+            {isGuest ? (
+              <div className="space-y-2.5">
+                <button
+                  onClick={() => { setAuthView('register'); setScreen('P1'); }}
+                  className="w-full py-3.5 px-6 rounded-xl bg-[#259D4A] text-white font-extrabold text-sm uppercase"
+                >
+                  Crear mi cuenta y guardar mis {xp} XP
+                </button>
+                <button
+                  onClick={() => { setScreen('P2'); setActiveTab('ruta'); }}
+                  className="w-full py-3 px-6 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-xs uppercase"
+                >
+                  Seguir explorando sin registro
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => { setScreen('P2'); setActiveTab('ruta'); }}
+                className="w-full py-4 px-6 rounded-2xl bg-emerald-600 border-b-4 border-emerald-800 text-white font-extrabold text-sm uppercase"
+              >
+                Volver al Home
+              </button>
+            )}
           </div>
         )}
       </div>
