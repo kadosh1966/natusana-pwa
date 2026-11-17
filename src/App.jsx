@@ -2,18 +2,29 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Heart, Flame, Coins, Award, RefreshCw, Sparkles,
   Trophy, Cloud, Download, Eye, EyeOff, LogOut,
-  UserPlus, LogIn, Sprout, ArrowLeft, Lock, Gamepad2,
-  ExternalLink, KeyRound, Mail, CheckCircle2, UserCog
+  UserPlus, LogIn, ArrowLeft, Lock, Gamepad2,
+  ExternalLink, KeyRound, Mail, UserCog, Star, RotateCcw
 } from 'lucide-react';
 
 // ============================================================================
-// 1. CONFIGURACIÓN RÁPIDA DE SUPABASE, BANNER PUBLICITARIO Y EMAILJS
+// 1. CONFIGURACIÓN DE SUPABASE, EMAILJS (EN VIVO), LOGO Y BANNER PUBLICITARIO
 // ============================================================================
 const SUPABASE_URL = 'https://yxpcctelsoqtsvtcczbc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_edcInk7TUTAxp9VjxvU0rg_e4_pCemG';
-const STORAGE_KEY = 'natusana_active_session_v2';
+const STORAGE_KEY = 'natusana_active_session_v3';
 
-// ACTUALIZA AQUÍ TU BANNER INFERIOR FIJO (IMAGEN + LINK CLICABLE)
+// RUTA FIJA DEL LOGO: Si subes una imagen llamada "logo-natusana.png" a la
+// carpeta "public/" en GitHub, se actualizará sola en toda la app sin tocar código.
+const LOGO_FILE_PATH = '/logo-natusana.png';
+
+// LLAVES OFICIALES DE EMAILJS CONECTADAS A natusana.app@gmail.com
+const EMAILJS_CONFIG = {
+  serviceId: 'service_cbvpnvl',
+  templateId: 'template_axne6nn',
+  publicKey: 'Uf5pOKuMNaDm3xEsy'
+};
+
+// CONFIGURACIÓN DEL BANNER PUBLICITARIO INFERIOR FIJO (IMAGEN + LINK)
 const BANNER_CONFIG = {
   imageUrl: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=1000&q=80',
   linkUrl: 'https://wa.me/51999999999?text=Hola,%20vengo%20de%20la%20app%20NatuSana%20y%20quiero%20informaci%C3%B3n%20de%20suplementos%20naturales',
@@ -22,17 +33,11 @@ const BANNER_CONFIG = {
   ctaText: 'Ver catálogo >'
 };
 
-// CONFIGURACIÓN GRATUITA DE EMAILJS (Opcional: pega tus IDs de emailjs.com)
-// Si aún no pegas tus llaves de EmailJS, la app enviará el código en modo asistido
-const EMAILJS_CONFIG = {
-  serviceId: '',  // Ej: 'service_natusana'
-  templateId: '', // Ej: 'template_codigo6'
-  publicKey: ''   // Ej: 'user_xxxxxxxxxxxxx'
-};
-
-// Configuración del esquema 10 x 10 (10 lecciones de 10 preguntas = 100 por diploma)
+// Reglas pedagógicas acordadas: 10 lecciones x 10 preguntas, 9 aciertos (3 estrellas) y 2 vidas por lección
 const LESSONS_PER_SPECIALTY = 10;
 const QUESTIONS_PER_LESSON = 10;
+const MIN_CORRECT_FOR_3_STARS = 9;
+const MAX_LIVES_PER_LESSON = 2;
 
 const supabaseRequest = async (endpoint, options = {}) => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
@@ -51,6 +56,79 @@ const supabaseRequest = async (endpoint, options = {}) => {
   const text = await res.text();
   return text ? JSON.parse(text) : null;
 };
+
+// ============================================================================
+// COMPONENTE DEL LOGO OFICIAL NATUSANA (CARGA /logo-natusana.png + RESPALDO)
+// ============================================================================
+function NatuSanaLogo({ size = 'lg', showText = true }) {
+  const [imgError, setImgError] = useState(false);
+  const dimensions = size === 'lg' ? 'w-28 h-28' : size === 'md' ? 'w-14 h-14' : 'w-8 h-8';
+
+  if (!imgError) {
+    return (
+      <div className="flex flex-col items-center">
+        <img
+          src={LOGO_FILE_PATH}
+          alt="NatuSana"
+          onError={() => setImgError(true)}
+          className={`${dimensions} object-contain rounded-2xl`}
+        />
+      </div>
+    );
+  }
+
+  // Respaldo vectorial fiel a tu logo de la hojita leyendo su libro
+  return (
+    <div className="flex flex-col items-center select-none">
+      <div
+        className={`${
+          size === 'lg' ? 'w-24 h-24 rounded-[26px]' : size === 'md' ? 'w-12 h-12 rounded-2xl' : 'w-7 h-7 rounded-xl'
+        } bg-gradient-to-b from-[#34C73B] to-[#087F23] flex items-center justify-center shadow-md relative overflow-hidden p-1.5`}
+      >
+        <svg viewBox="0 0 120 120" className="w-full h-full">
+          {/* Destellos amarillos */}
+          <line x1="94" y1="24" x2="100" y2="14" stroke="#FACC15" strokeWidth="5" strokeLinecap="round" />
+          <line x1="101" y1="34" x2="111" y2="28" stroke="#FACC15" strokeWidth="5" strokeLinecap="round" />
+          <line x1="102" y1="45" x2="112" y2="45" stroke="#FACC15" strokeWidth="5" strokeLinecap="round" />
+          {/* Cuerpo de hojita */}
+          <path
+            d="M60 14 C82 14, 96 42, 92 70 C88 92, 32 92, 28 70 C24 42, 38 22, 60 14 Z"
+            fill="#A3E635"
+          />
+          {/* Nervadura superior */}
+          <path d="M58 22 Q56 35 55 42 M56 32 L66 24" stroke="#369B2C" strokeWidth="3.5" strokeLinecap="round" fill="none" />
+          {/* Ojos */}
+          <ellipse cx="46" cy="54" rx="5.5" ry="7" fill="#064E3B" />
+          <circle cx="44.5" cy="51.5" r="2" fill="#FFFFFF" />
+          <ellipse cx="74" cy="54" rx="5.5" ry="7" fill="#064E3B" />
+          <circle cx="72.5" cy="51.5" r="2" fill="#FFFFFF" />
+          {/* Mejillas */}
+          <ellipse cx="36" cy="61" rx="5" ry="3" fill="#FB7185" opacity="0.8" />
+          <ellipse cx="84" cy="61" rx="5" ry="3" fill="#FB7185" opacity="0.8" />
+          {/* Sonrisa */}
+          <path d="M53 60 Q60 69 67 60 Z" fill="#064E3B" />
+          <path d="M56 64 Q60 68 64 64 Z" fill="#FB7185" />
+          {/* Libro abierto */}
+          <path d="M36 72 L60 76 L60 98 L36 93 Z" fill="#FEF9C3" stroke="#E5E7EB" strokeWidth="1.5" />
+          <path d="M84 72 L60 76 L60 98 L84 93 Z" fill="#FEFCE8" stroke="#E5E7EB" strokeWidth="1.5" />
+          {/* Hojita en la portada del libro */}
+          <path d="M68 89 C70 81, 77 79, 79 81 C79 86, 74 91, 68 89 Z" fill="#4ADE80" />
+          {/* Manitos y patitas */}
+          <ellipse cx="35" cy="80" rx="5" ry="4" fill="#065F46" />
+          <ellipse cx="85" cy="80" rx="5" ry="4" fill="#065F46" />
+          <ellipse cx="47" cy="103" rx="7" ry="4" fill="#064E3B" />
+          <ellipse cx="73" cy="103" rx="7" ry="4" fill="#064E3B" />
+        </svg>
+      </div>
+      {showText && (
+        <div className={`${size === 'lg' ? 'text-3xl mt-2' : 'text-lg mt-1'} font-black tracking-tight leading-none`}>
+          <span className="text-[#09521E]">Natu</span>
+          <span className="text-[#49B618]">Sana</span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ============================================================================
 // 2. POOLS GLOBALES DE 22+ DISTRACTORES POR ESPECIALIDAD
@@ -339,7 +417,7 @@ function shuffleArray(arr) {
 }
 
 export default function App() {
-  // Pantallas: 'P1' = Onboarding, 'P2' = Home (4 Pestañas), 'P3' = Juego 10 preg, 'P5' = Fin de Lección, 'PROFILE' = Editar perfil
+  // 'P1' = Onboarding, 'P2' = Home (4 Pestañas), 'P3' = Pregunta, 'P5' = Fin de Lección, 'PROFILE' = Editar perfil
   const [screen, setScreen] = useState('P1');
   // Subvistas de P1: 'welcome' | 'register' | 'login' | 'forgot'
   const [authView, setAuthView] = useState('welcome');
@@ -355,9 +433,10 @@ export default function App() {
   const [storeName, setStoreName] = useState('');
   const [xp, setXp] = useState(0);
   const [streak, setStreak] = useState(1);
-  const [lives, setLives] = useState(5);
+  // Corazones por lección (2 corazones por lección)
+  const [lives, setLives] = useState(MAX_LIVES_PER_LESSON);
 
-  // Progreso 10 lecciones por especialidad (0 a 10)
+  // Progreso de las 10 lecciones por especialidad (0 a 10)
   const [lessonProgress, setLessonProgress] = useState({
     citratos: 0,
     adaptogenos: 0,
@@ -377,13 +456,12 @@ export default function App() {
   const [authSuccess, setAuthSuccess] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Estado de Recuperación de Contraseña (Código de 6 dígitos al correo)
-  const [resetStep, setResetStep] = useState(1); // 1: pedir correo, 2: código + nueva clave
+  // Estado de Recuperación de Contraseña (Código de 6 dígitos vía EmailJS)
+  const [resetStep, setResetStep] = useState(1);
   const [resetEmail, setResetEmail] = useState('');
   const [generatedCode, setGeneratedCode] = useState('');
   const [inputCode, setInputCode] = useState('');
   const [newResetPass, setNewResetPass] = useState('');
-  const [resetFallbackNotice, setResetFallbackNotice] = useState('');
 
   // Estado de Editar Perfil
   const [editAlias, setEditAlias] = useState('');
@@ -399,7 +477,7 @@ export default function App() {
   const [syncMessage, setSyncMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Estado de partida activa (10 preguntas por lección)
+  // Estado de partida activa (10 preguntas por lección, 2 corazones, 3 estrellas)
   const [currentSpecId, setCurrentSpecId] = useState('citratos');
   const [currentLessonNum, setCurrentLessonNum] = useState(1);
   const [lessonQuestions, setLessonQuestions] = useState([]);
@@ -408,7 +486,11 @@ export default function App() {
   const [optionsOnScreen, setOptionsOnScreen] = useState([]);
   const [feedbackState, setFeedbackState] = useState(null);
   const [correctCountInLesson, setCorrectCountInLesson] = useState(0);
-  const [selectedCertSpec, setSelectedCertSpec] = useState('citratos');
+  // Resultado al terminar la lección: 'approved' (9-10 aciertos / 3 estrellas) | 'no_lives' (2 fallos) | 'insufficient_stars'
+  const [lessonResultType, setLessonResultType] = useState('approved');
+
+  // Estrellas ganadas en tiempo real en la lección actual (1 estrella cada 3 aciertos)
+  const currentStarsEarned = Math.min(3, Math.floor(correctCountInLesson / 3));
 
   // Cantidad de especialidades completadas al 100% (10/10 lecciones) para el Diploma Máster
   const completedSpecialtiesCount = useMemo(() => {
@@ -432,7 +514,7 @@ export default function App() {
           setStoreName(parsed.store_code || '');
           setXp(typeof parsed.xp_total === 'number' ? parsed.xp_total : 0);
           setStreak(parsed.streak_days || 1);
-          setLives(parsed.lives || 5);
+          setLives(MAX_LIVES_PER_LESSON);
           if (parsed.lessonProgress) {
             setLessonProgress(prev => ({ ...prev, ...parsed.lessonProgress }));
           }
@@ -510,11 +592,12 @@ export default function App() {
     setUserName('Visitante');
     setUserRole('consumidor');
     setStoreName('');
+    setLives(MAX_LIVES_PER_LESSON);
     setScreen('P2');
     setActiveTab('ruta');
   };
 
-  // Registro de Cuenta (Alias + Correo + Clave + Consumidor o Nombre de Tienda)
+  // Registro de Cuenta
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     setAuthError('');
@@ -560,7 +643,7 @@ export default function App() {
           store_code: cleanStore || 'CONSUMIDOR',
           xp_total: initialXp,
           streak_days: 1,
-          lives: 5
+          lives: MAX_LIVES_PER_LESSON
         })
       });
 
@@ -572,7 +655,7 @@ export default function App() {
         store_code: cleanStore || 'CONSUMIDOR',
         xp_total: initialXp,
         streak_days: 1,
-        lives: 5
+        lives: MAX_LIVES_PER_LESSON
       };
 
       setUserId(createdUser.id);
@@ -583,7 +666,7 @@ export default function App() {
       setStoreName(createdUser.store_code === 'CONSUMIDOR' ? '' : createdUser.store_code);
       setXp(createdUser.xp_total);
       setStreak(createdUser.streak_days || 1);
-      setLives(createdUser.lives || 5);
+      setLives(MAX_LIVES_PER_LESSON);
 
       saveLocalSession({
         id: createdUser.id,
@@ -594,7 +677,7 @@ export default function App() {
         store_code: createdUser.store_code === 'CONSUMIDOR' ? '' : createdUser.store_code,
         xp_total: createdUser.xp_total,
         streak_days: createdUser.streak_days || 1,
-        lives: createdUser.lives || 5,
+        lives: MAX_LIVES_PER_LESSON,
         lessonProgress
       });
 
@@ -653,7 +736,7 @@ export default function App() {
       setStoreName(cleanStore);
       setXp(userRecord.xp_total || 0);
       setStreak(userRecord.streak_days || 1);
-      setLives(userRecord.lives || 5);
+      setLives(MAX_LIVES_PER_LESSON);
 
       const updatedProgress = {
         citratos: 0,
@@ -682,7 +765,7 @@ export default function App() {
         store_code: cleanStore,
         xp_total: userRecord.xp_total || 0,
         streak_days: userRecord.streak_days || 1,
-        lives: userRecord.lives || 5,
+        lives: MAX_LIVES_PER_LESSON,
         lessonProgress: updatedProgress
       });
 
@@ -696,13 +779,12 @@ export default function App() {
   };
 
   // ==========================================================================
-  // RECUPERACIÓN DE CONTRASEÑA CON CÓDIGO DE 6 DÍGITOS AL CORREO (EMAILJS)
+  // RECUPERACIÓN DE CONTRASEÑA CON CÓDIGO DE 6 DÍGITOS AL CORREO (EMAILJS VIVO)
   // ==========================================================================
   const handleSendRecoveryCode = async (e) => {
     e.preventDefault();
     setAuthError('');
     setAuthSuccess('');
-    setResetFallbackNotice('');
 
     const cleanEmail = resetEmail.trim().toLowerCase();
     if (!cleanEmail) {
@@ -723,35 +805,34 @@ export default function App() {
       const code6 = String(Math.floor(100000 + Math.random() * 900000));
       setGeneratedCode(code6);
 
-      // Si las llaves de EmailJS están configuradas, envía el correo real
-      if (EMAILJS_CONFIG.serviceId && EMAILJS_CONFIG.templateId && EMAILJS_CONFIG.publicKey) {
-        const emailRes = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            service_id: EMAILJS_CONFIG.serviceId,
-            template_id: EMAILJS_CONFIG.templateId,
-            user_id: EMAILJS_CONFIG.publicKey,
-            template_params: {
-              to_email: cleanEmail,
-              to_name: targetUser.alias || 'Estudiante NatuSana',
-              recovery_code: code6
-            }
-          })
-        });
-        if (!emailRes.ok) {
-          throw new Error('No se pudo contactar al servidor de correo EmailJS.');
-        }
-        setAuthSuccess(`Enviamos un código de 6 dígitos a ${cleanEmail}. Revisa tu bandeja o Spam.`);
-      } else {
-        // Modo asistido instantáneo mientras terminas de pegar tus llaves de EmailJS
-        setAuthSuccess(`Código generado para ${cleanEmail}.`);
-        setResetFallbackNotice(`Modo directo activo (pendiente configurar llaves EmailJS): Tu código de verificación es ${code6}`);
+      // Envío en vivo con tus llaves de EmailJS (compatible con {{email}}/{{to_email}} y {{passcode}}/{{recovery_code}})
+      const emailRes = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service_id: EMAILJS_CONFIG.serviceId,
+          template_id: EMAILJS_CONFIG.templateId,
+          user_id: EMAILJS_CONFIG.publicKey,
+          template_params: {
+            email: cleanEmail,
+            to_email: cleanEmail,
+            to_name: targetUser.alias || 'Estudiante NatuSana',
+            passcode: code6,
+            recovery_code: code6,
+            time: '15 minutos'
+          }
+        })
+      });
+
+      if (!emailRes.ok) {
+        const errTxt = await emailRes.text();
+        throw new Error(errTxt || 'No se pudo enviar el correo desde EmailJS.');
       }
 
+      setAuthSuccess(`✅ Enviamos un código de 6 dígitos a ${cleanEmail}. Revisa tu bandeja principal o Spam.`);
       setResetStep(2);
     } catch (err) {
-      setAuthError(`Error al procesar la solicitud: ${err.message}`);
+      setAuthError(`Error al enviar el correo: ${err.message}`);
     } finally {
       setAuthLoading(false);
     }
@@ -763,7 +844,7 @@ export default function App() {
     setAuthSuccess('');
 
     if (inputCode.trim() !== generatedCode) {
-      setAuthError('El código de 6 dígitos no coincide. Verifica e intenta nuevamente.');
+      setAuthError('El código de 6 dígitos es incorrecto. Verifica el correo enviado por NatuSana.');
       return;
     }
     if (newResetPass.trim().length < 4) {
@@ -784,7 +865,6 @@ export default function App() {
       setResetStep(1);
       setInputCode('');
       setNewResetPass('');
-      setResetFallbackNotice('');
       setAuthView('login');
       setAuthSuccess('✅ ¡Contraseña actualizada con éxito! Ya puedes entrar a tu cuenta.');
     } catch (err) {
@@ -794,7 +874,7 @@ export default function App() {
     }
   };
 
-  // Abrir pantalla de Editar Perfil
+  // Editar Perfil
   const openProfileEditor = () => {
     setEditAlias(userName);
     setEditRole(userRole || 'consumidor');
@@ -851,7 +931,7 @@ export default function App() {
         store_code: cleanStore,
         xp_total: xp,
         streak_days: streak,
-        lives,
+        lives: MAX_LIVES_PER_LESSON,
         lessonProgress
       });
 
@@ -883,7 +963,7 @@ export default function App() {
     setScreen('P1');
   };
 
-  // Sincronización de progreso (10 lecciones por especialidad) con Supabase
+  // Sincronización con Supabase
   const syncUserToSupabase = async (newXp = xp, specIdUpdated = null, newLessonCount = null) => {
     const updatedMap = specIdUpdated
       ? { ...lessonProgress, [specIdUpdated]: newLessonCount }
@@ -899,7 +979,7 @@ export default function App() {
         store_code: '',
         xp_total: newXp,
         streak_days: streak,
-        lives,
+        lives: MAX_LIVES_PER_LESSON,
         lessonProgress: updatedMap
       });
       setSyncMessage('💡 Modo visitante: crea tu cuenta gratis para respaldar tu avance en la nube.');
@@ -916,7 +996,7 @@ export default function App() {
           body: JSON.stringify({
             xp_total: newXp,
             streak_days: streak,
-            lives: lives
+            lives: MAX_LIVES_PER_LESSON
           })
         });
 
@@ -960,7 +1040,7 @@ export default function App() {
         store_code: storeName,
         xp_total: newXp,
         streak_days: streak,
-        lives: lives,
+        lives: MAX_LIVES_PER_LESSON,
         lessonProgress: updatedMap
       });
 
@@ -977,18 +1057,15 @@ export default function App() {
   };
 
   // ==========================================================================
-  // MOTOR DE PARTIDA 10 x 10 (10 LECCIONES DE 10 PREGUNTAS CADA UNA)
+  // MOTOR DE PARTIDA: 10 PREGUNTAS + 2 CORAZONES + 3 ESTRELLAS (9/10 ACIERTOS)
   // ==========================================================================
   const startSpecialtyLesson = (specId) => {
     const doneLessons = lessonProgress[specId] || 0;
     const nextLesson = doneLessons < LESSONS_PER_SPECIALTY ? doneLessons + 1 : LESSONS_PER_SPECIALTY;
 
-    // Filtrar preguntas de la especialidad desde Supabase + respaldo semilla
     const poolForSpec = dbQuestions.filter(q => q.specialty_id === specId);
     const baseList = poolForSpec.length > 0 ? poolForSpec : FALLBACK_QUESTIONS.filter(q => q.specialty_id === specId);
 
-    // Si hay preguntas asignadas a module_num === nextLesson las prioriza, y completa hasta 10 preguntas
-    // barajando enunciados y generando nuevos distractores aleatorios en cada pregunta
     const moduleSpecific = baseList.filter(q => Number(q.module_num) === nextLesson);
     const sourceQuestions = moduleSpecific.length > 0 ? [...moduleSpecific, ...baseList] : baseList;
 
@@ -1009,13 +1086,15 @@ export default function App() {
     setLessonQuestions(tenQuestionsBlock);
     setQIndex(0);
     setCorrectCountInLesson(0);
+    // Inicia cada lección con 2 corazones intactos
+    setLives(MAX_LIVES_PER_LESSON);
     setFeedbackState(null);
+    setLessonResultType('approved');
     setScreen('P3');
   };
 
   const currentQ = lessonQuestions[qIndex] || FALLBACK_QUESTIONS[0];
 
-  // Barajado automático de distractores del pool cada vez que cambia la pregunta
   useEffect(() => {
     if (!currentQ) return;
     setSelectedOption(null);
@@ -1044,16 +1123,27 @@ export default function App() {
       setXp(x => x + 15);
     } else {
       setFeedbackState('wrong');
-      setLives(l => Math.max(1, l - 1));
+      setLives(l => Math.max(0, l - 1));
     }
   };
 
   const handleNextQuestion = () => {
+    // Regla 1: Si perdió sus 2 corazones (lives === 0), regresa de inmediato a repetir esa lección
+    if (lives <= 0) {
+      setLessonResultType('no_lives');
+      setScreen('P5');
+      return;
+    }
+
+    // Si aún quedan preguntas en la tanda de 10 y tiene al menos 1 corazón vivo
     if (qIndex + 1 < lessonQuestions.length) {
       setQIndex(i => i + 1);
-    } else {
-      // Terminó las 10 preguntas de la lección
-      const bonusXp = 40;
+      return;
+    }
+
+    // Regla 2: Llegó al final de las 10 preguntas -> Evaluar si obtuvo las 3 estrellas (mínimo 9 de 10)
+    if (correctCountInLesson >= MIN_CORRECT_FOR_3_STARS) {
+      const bonusXp = 45;
       const newTotalXp = xp + bonusXp;
       setXp(newTotalXp);
 
@@ -1065,8 +1155,12 @@ export default function App() {
         [currentSpecId]: updatedLessonNum
       }));
 
-      setSelectedCertSpec(currentSpecId);
+      setLessonResultType('approved');
       syncUserToSupabase(newTotalXp, currentSpecId, updatedLessonNum);
+      setScreen('P5');
+    } else {
+      // Terminó pero no alcanzó las 3 estrellas (9 aciertos)
+      setLessonResultType('insufficient_stars');
       setScreen('P5');
     }
   };
@@ -1080,7 +1174,6 @@ export default function App() {
     canvas.height = 820;
     const ctx = canvas.getContext('2d');
 
-    // Fondo según tipo (Dorado para Máster, Verde Botánico para Especialidad)
     ctx.fillStyle = isMaster ? '#FFFBEB' : '#ECFDF5';
     ctx.fillRect(0, 0, 1200, 820);
 
@@ -1088,20 +1181,24 @@ export default function App() {
     ctx.lineWidth = 18;
     ctx.strokeRect(40, 40, 1120, 740);
 
-    ctx.fillStyle = isMaster ? '#92400E' : '#065F46';
-    ctx.font = 'bold 30px sans-serif';
+    ctx.fillStyle = '#09521E';
+    ctx.font = 'bold 42px sans-serif';
     ctx.textAlign = 'center';
+    ctx.fillText('🌿 NatuSana', 600, 115);
+
+    ctx.fillStyle = isMaster ? '#92400E' : '#065F46';
+    ctx.font = 'bold 26px sans-serif';
     ctx.fillText(
       isMaster
-        ? 'CERTIFICACIÓN MÁSTER DE HONOR • NATUSANA EDUCACIÓN EN SALUD NATURAL'
-        : 'CERTIFICACIÓN OFICIAL NATUSANA • EDUCACIÓN EN SALUD NATURAL',
+        ? 'CERTIFICACIÓN MÁSTER DE HONOR • EDUCACIÓN EN SALUD NATURAL'
+        : 'CERTIFICACIÓN OFICIAL DE ESPECIALIDAD • EDUCACIÓN EN SALUD NATURAL',
       600,
-      145
+      165
     );
 
     ctx.fillStyle = '#6B7280';
     ctx.font = '24px sans-serif';
-    ctx.fillText('Otorgado a:', 600, 240);
+    ctx.fillText('Otorgado a:', 600, 245);
 
     ctx.fillStyle = '#111827';
     ctx.font = 'bold 56px sans-serif';
@@ -1119,9 +1216,11 @@ export default function App() {
     ctx.strokeRect(120, 435, 960, 165);
 
     ctx.fillStyle = isMaster ? '#B45309' : '#047857';
-    ctx.font = 'bold 22px sans-serif';
+    ctx.font = 'bold 21px sans-serif';
     ctx.fillText(
-      isMaster ? 'MÁXIMA DISTINCIÓN ACREDITADA (5 ESPECIALIDADES COMPLETADAS):' : 'ESPECIALIDAD ACREDITADA (10 LECCIONES COMPLETADAS):',
+      isMaster
+        ? 'MÁXIMA DISTINCIÓN ACREDITADA (5 ESPECIALIDADES CON 3 ESTRELLAS):'
+        : 'ESPECIALIDAD ACREDITADA (10 LECCIONES APROBADAS CON 3 ESTRELLAS):',
       600,
       485
     );
@@ -1154,14 +1253,17 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-start pt-3 pb-24 px-2 font-sans select-none">
-      {/* Barra superior de cuenta y estado */}
+      {/* Barra superior con el nuevo Logo de NatuSana */}
       <div className="w-full max-w-md mb-2 px-3.5 py-2 rounded-2xl bg-slate-800/95 border border-slate-700 flex items-center justify-between text-xs text-slate-300">
         <div className="flex items-center gap-2 min-w-0">
-          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dbStatus === 'online' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-          <span className="font-bold text-white shrink-0">NatuSana</span>
+          <NatuSanaLogo size="sm" showText={false} />
+          <span className="font-black text-white shrink-0 tracking-tight">
+            Natu<span className="text-[#49B618]">Sana</span>
+          </span>
+          <span className={`w-2 h-2 rounded-full shrink-0 ${dbStatus === 'online' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
           {isGuest ? (
             <span className="text-[11px] text-emerald-300 font-semibold truncate">
-              • Modo Visitante
+              • Visitante
             </span>
           ) : (
             <button
@@ -1201,30 +1303,25 @@ export default function App() {
         )}
       </div>
 
-      {/* Contenedor Principal Móvil con margen inferior para que el scroll pase por detrás del banner */}
+      {/* Contenedor Principal Móvil */}
       <div className="w-full max-w-md bg-[#F9FAFB] rounded-[32px] shadow-2xl border-4 border-slate-800 overflow-hidden flex flex-col mb-4">
 
         {/* ===================================================================== */}
-        {/* PANTALLA P1: ONBOARDING (BIENVENIDA / REGISTRO / LOGIN / OLVIDÉ CLAVE)*/}
+        {/* PANTALLA P1: ONBOARDING CON EL NUEVO LOGO NATUSANA                     */}
         {/* ===================================================================== */}
         {screen === 'P1' && (
           <div className="p-6 sm:p-8 min-h-[540px] flex flex-col justify-center bg-[#F4F6F4]">
             {authView === 'welcome' && (
               <div className="flex flex-col items-center text-center my-auto">
-                <div className="flex flex-col items-center mb-8">
-                  <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center mb-2 shadow-sm">
-                    <Sprout className="w-9 h-9 text-[#1E9E49] stroke-[2.2]" />
-                  </div>
-                  <span className="text-3xl font-extrabold text-[#1C1E21] tracking-tight">
-                    NatuSana
-                  </span>
+                <div className="mb-6">
+                  <NatuSanaLogo size="lg" showText={true} />
                 </div>
 
-                <h1 className="text-2xl sm:text-[28px] font-extrabold text-[#1C1E21] leading-tight mb-3">
+                <h1 className="text-2xl sm:text-[27px] font-extrabold text-[#1C1E21] leading-tight mb-3">
                   ¡Bienvenido a NatuSana!
                 </h1>
-                <p className="text-sm sm:text-base text-[#606770] max-w-xs leading-relaxed mb-8">
-                  Aprende sobre salud natural con lecciones cortas, obtén tus diplomas y compite en el ranking.
+                <p className="text-sm sm:text-base text-[#606770] max-w-xs leading-relaxed mb-7">
+                  Aprende sobre salud natural con lecciones cortas, gana las 3 estrellas y obtén tus diplomas.
                 </p>
 
                 <button
@@ -1253,22 +1350,22 @@ export default function App() {
               </div>
             )}
 
-            {/* VISTA REGISTRO: CASILLA "NOMBRE DE LA TIENDA" AL ELEGIR ASESOR/TIENDA */}
+            {/* VISTA REGISTRO */}
             {authView === 'register' && (
               <div className="my-auto">
                 <button
                   onClick={() => setAuthView('welcome')}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 mb-4"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 mb-3"
                 >
                   <ArrowLeft className="w-4 h-4" /> Volver a bienvenida
                 </button>
 
-                <div className="flex items-center gap-2 mb-1">
-                  <Sprout className="w-6 h-6 text-[#259D4A]" />
+                <div className="flex items-center gap-2.5 mb-2">
+                  <NatuSanaLogo size="sm" showText={false} />
                   <h2 className="text-2xl font-extrabold text-slate-900">Crear mi cuenta</h2>
                 </div>
-                <p className="text-xs text-slate-600 mb-5">
-                  Guarda tu avance en las 10 lecciones de cada diploma y suma puntos en el Ranking.
+                <p className="text-xs text-slate-600 mb-4">
+                  Guarda tu avance en las 10 lecciones de cada diploma y compite en el Ranking.
                 </p>
 
                 {authError && (
@@ -1396,7 +1493,7 @@ export default function App() {
               </div>
             )}
 
-            {/* VISTA INICIAR SESIÓN + BOTÓN "¿OLVIDASTE TU CONTRASEÑA?" */}
+            {/* VISTA INICIAR SESIÓN */}
             {authView === 'login' && (
               <div className="my-auto">
                 <button
@@ -1406,8 +1503,8 @@ export default function App() {
                   <ArrowLeft className="w-4 h-4" /> Volver a bienvenida
                 </button>
 
-                <div className="flex items-center gap-2 mb-1">
-                  <LogIn className="w-6 h-6 text-[#259D4A]" />
+                <div className="flex items-center gap-2.5 mb-1">
+                  <NatuSanaLogo size="sm" showText={false} />
                   <h2 className="text-2xl font-extrabold text-slate-900">Inicia sesión</h2>
                 </div>
                 <p className="text-xs text-slate-600 mb-5">
@@ -1500,7 +1597,7 @@ export default function App() {
               </div>
             )}
 
-            {/* VISTA RECUPERAR CONTRASEÑA CON CÓDIGO DE 6 DÍGITOS AL CORREO */}
+            {/* VISTA RECUPERAR CONTRASEÑA CON CÓDIGO DE 6 DÍGITOS VÍA EMAILJS */}
             {authView === 'forgot' && (
               <div className="my-auto">
                 <button
@@ -1516,8 +1613,8 @@ export default function App() {
                 </div>
                 <p className="text-xs text-slate-600 mb-5">
                   {resetStep === 1
-                    ? 'Ingresa tu correo electrónico y te enviaremos un código de 6 dígitos.'
-                    : 'Ingresa el código de 6 dígitos recibido y escribe tu nueva contraseña.'}
+                    ? 'Ingresa tu correo registrado y te enviaremos un código de 6 dígitos desde natusana.app@gmail.com.'
+                    : 'Ingresa el código de 6 dígitos que llegó a tu correo y escribe tu nueva clave.'}
                 </p>
 
                 {authError && (
@@ -1527,14 +1624,8 @@ export default function App() {
                 )}
 
                 {authSuccess && (
-                  <div className="mb-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800">
+                  <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800">
                     {authSuccess}
-                  </div>
-                )}
-
-                {resetFallbackNotice && (
-                  <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-300 text-xs font-bold text-amber-900">
-                    🔑 {resetFallbackNotice}
                   </div>
                 )}
 
@@ -1562,14 +1653,14 @@ export default function App() {
                       disabled={authLoading}
                       className="w-full py-3.5 px-6 rounded-xl bg-[#259D4A] hover:bg-[#1f873f] text-white font-bold text-sm shadow-sm transition"
                     >
-                      {authLoading ? 'Enviando código...' : 'Enviar código de 6 dígitos'}
+                      {authLoading ? 'Enviando código a tu correo...' : 'Enviar código de 6 dígitos'}
                     </button>
                   </form>
                 ) : (
                   <form onSubmit={handleConfirmRecoveryPassword} className="space-y-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Código de 6 dígitos
+                        Código de 6 dígitos recibido en tu correo
                       </label>
                       <input
                         type="text"
@@ -1635,17 +1726,6 @@ export default function App() {
               Actualiza cómo aparece tu nombre en los diplomas y el nombre de tu tienda.
             </p>
 
-            <div className="grid grid-cols-2 gap-2.5 mb-4">
-              <div className="bg-white p-2.5 rounded-xl border border-slate-200 flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500">Puntaje:</span>
-                <span className="text-xs font-black text-amber-600">{xp} XP</span>
-              </div>
-              <div className="bg-white p-2.5 rounded-xl border border-slate-200 flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500">Racha:</span>
-                <span className="text-xs font-black text-amber-600">🔥 {streak}d</span>
-              </div>
-            </div>
-
             {authError && (
               <div className="mb-3 p-3 rounded-xl bg-red-50 border border-red-200 text-xs font-bold text-red-700">
                 {authError}
@@ -1668,7 +1748,7 @@ export default function App() {
 
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">
-                  Correo electrónico (identificador de cuenta)
+                  Correo electrónico
                 </label>
                 <input
                   type="email"
@@ -1758,14 +1838,15 @@ export default function App() {
         )}
 
         {/* ===================================================================== */}
-        {/* BARRA SUPERIOR Y LAS 4 PESTAÑAS (OPCIÓN A: RUTA | DIPLOMAS | RETOS | RANKING) */}
+        {/* BARRA SUPERIOR Y LAS 4 PESTAÑAS (OPCIÓN A)                            */}
         {/* ===================================================================== */}
         {screen !== 'P1' && screen !== 'P3' && screen !== 'PROFILE' && (
           <div className="bg-white border-b border-slate-200 sticky top-0 z-30">
             <div className="px-3 py-2.5 flex items-center justify-between border-b border-slate-100">
-              <div className="flex items-center gap-1.5 bg-red-50 px-2.5 py-1 rounded-xl border border-red-100">
+              <div className="flex items-center gap-1 bg-red-50 px-2.5 py-1 rounded-xl border border-red-100" title="2 corazones por lección">
                 <Heart className="w-4 h-4 text-red-500 fill-red-500" />
-                <span className="font-extrabold text-red-600 text-xs">{lives}</span>
+                <Heart className="w-4 h-4 text-red-500 fill-red-500" />
+                <span className="font-extrabold text-red-600 text-xs ml-0.5">{MAX_LIVES_PER_LESSON}</span>
               </div>
               <div className="flex items-center gap-1.5 bg-amber-50 px-2.5 py-1 rounded-xl border border-amber-100">
                 <Flame className="w-4 h-4 text-amber-500 fill-amber-500" />
@@ -1794,7 +1875,6 @@ export default function App() {
               )}
             </div>
 
-            {/* 4 PESTAÑAS ACORDADAS (OPCIÓN A) */}
             <div className="grid grid-cols-4 gap-1 px-2 py-1.5 bg-slate-50">
               <button
                 onClick={() => { setScreen('P2'); setActiveTab('ruta'); }}
@@ -1872,10 +1952,10 @@ export default function App() {
               </div>
             )}
 
-            {/* PESTAÑA 1: RUTA (5 ESPECIALIDADES ABIERTAS DE 10 LECCIONES x 10 PREGUNTAS) */}
+            {/* PESTAÑA 1: RUTA */}
             {activeTab === 'ruta' && (
               <div>
-                <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-4 text-white mb-4 shadow-md flex items-center justify-between">
+                <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-4 text-white mb-4 shadow-md flex items-center justify-between gap-3">
                   <div>
                     <span className="text-[10px] uppercase tracking-wider font-extrabold bg-white/20 px-2 py-0.5 rounded-md">
                       {isGuest
@@ -1886,7 +1966,7 @@ export default function App() {
                     </span>
                     <h2 className="text-lg font-extrabold mt-1">¡Hola, {userName}!</h2>
                     <p className="text-xs text-emerald-100">
-                      Las 5 especialidades están abiertas. Completa las 10 lecciones (10 preguntas c/u) para certificar cada una.
+                      Cada lección tiene 10 preguntas y 2 corazones ❤️❤️. Consigue las 3 estrellas ⭐⭐⭐ (9/10 aciertos) para avanzar.
                     </p>
                   </div>
                 </div>
@@ -1938,11 +2018,10 @@ export default function App() {
                             </h3>
                             <p className="text-xs text-slate-500 mt-0.5">{spec.subtitle}</p>
 
-                            {/* Barra de progreso 10x10 */}
                             <div className="mt-3">
                               <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 mb-1">
                                 <span>
-                                  Avance: {completedCount}/{LESSONS_PER_SPECIALTY} lecciones (10 preg. por lección)
+                                  Aprobadas con ⭐⭐⭐: {completedCount}/{LESSONS_PER_SPECIALTY}
                                 </span>
                                 <span className="text-emerald-700 font-extrabold">{progressPct}%</span>
                               </div>
@@ -1962,10 +2041,9 @@ export default function App() {
               </div>
             )}
 
-            {/* PESTAÑA 2: DIPLOMAS (MÁSTER DORADO AUTOMÁTICO + 5 ESPECIALIDADES) */}
+            {/* PESTAÑA 2: DIPLOMAS */}
             {activeTab === 'diplomas' && (
               <div className="space-y-4">
-                {/* TARJETA SUPERIOR: DIPLOMA MÁSTER DORADO (SE DESBLOQUEA AL CUMPLIR LAS 5 ESPECIALIDADES) */}
                 <div
                   className={`rounded-3xl border-2 p-5 shadow-md text-center ${
                     isMasterUnlocked
@@ -1980,7 +2058,7 @@ export default function App() {
                     Máster Experto en Suplementación y Bienestar Natural
                   </h3>
                   <p className="text-xs text-slate-600 mt-1">
-                    Se desbloquea automáticamente al completar tus primeras 5 especialidades (sin examen adicional).
+                    Se desbloquea automáticamente al completar las 5 especialidades con sus 10 lecciones aprobadas.
                   </p>
 
                   <div className="my-3">
@@ -2010,9 +2088,8 @@ export default function App() {
                   )}
                 </div>
 
-                {/* LISTA DE LOS 5 DIPLOMAS DE ESPECIALIDAD */}
                 <h4 className="text-xs font-extrabold uppercase text-slate-500 px-1">
-                  Diplomas por Especialidad (10 lecciones c/u)
+                  Diplomas por Especialidad (10 lecciones de 3 estrellas c/u)
                 </h4>
 
                 <div className="space-y-3">
@@ -2060,7 +2137,7 @@ export default function App() {
               </div>
             )}
 
-            {/* PESTAÑA 3: RETOS (NUEVAS ACTIVIDADES POR PUNTOS EXTRA - PRÓXIMAMENTE) */}
+            {/* PESTAÑA 3: RETOS */}
             {activeTab === 'retos' && (
               <div className="space-y-3.5">
                 <div className="bg-gradient-to-r from-teal-600 to-emerald-600 rounded-2xl p-4 text-white shadow-md">
@@ -2104,7 +2181,7 @@ export default function App() {
               </div>
             )}
 
-            {/* PESTAÑA 4: RANKING EN VIVO */}
+            {/* PESTAÑA 4: RANKING */}
             {activeTab === 'ranking' && (
               <div className="space-y-4">
                 <div className="bg-gradient-to-r from-amber-500 to-amber-600 rounded-2xl p-4 text-white shadow-md">
@@ -2181,15 +2258,16 @@ export default function App() {
         )}
 
         {/* ===================================================================== */}
-        {/* PANTALLA P3: PREGUNTA ACTIVA (SIN BOTÓN BARAJAR + TIP NATUSANA)       */}
+        {/* PANTALLA P3: PREGUNTA ACTIVA (2 CORAZONES + 3 ESTRELLAS EN VIVO)      */}
         {/* ===================================================================== */}
         {screen === 'P3' && currentQ && (
           <div className="flex flex-col justify-between p-4 bg-[#F9FAFB] relative min-h-[540px]">
             <div>
-              <div className="flex items-center gap-3 mb-4">
+              {/* Barra superior de partida: Salir + Progreso + 3 Estrellas + 2 Corazones */}
+              <div className="flex items-center gap-2.5 mb-3">
                 <button
                   onClick={() => setScreen('P2')}
-                  className="w-8 h-8 rounded-xl bg-slate-200/80 flex items-center justify-center text-slate-600 font-bold text-sm"
+                  className="w-8 h-8 rounded-xl bg-slate-200/80 flex items-center justify-center text-slate-600 font-bold text-sm shrink-0"
                 >
                   ✕
                 </button>
@@ -2199,15 +2277,42 @@ export default function App() {
                     style={{ width: `${((qIndex + 1) / lessonQuestions.length) * 100}%` }}
                   />
                 </div>
-                <div className="flex items-center gap-1 text-red-500 font-extrabold text-sm">
-                  <Heart className="w-4 h-4 fill-red-500" /> {lives}
+
+                {/* Indicador de 3 Estrellas (1 estrella por cada 3 aciertos) */}
+                <div className="flex items-center gap-0.5 bg-amber-50 px-2 py-1 rounded-xl border border-amber-200 shrink-0" title="3 aciertos = 1 estrella (9 aciertos = 3 estrellas)">
+                  {[1, 2, 3].map(starNum => (
+                    <Star
+                      key={starNum}
+                      className={`w-4 h-4 transition-all ${
+                        currentStarsEarned >= starNum
+                          ? 'text-amber-400 fill-amber-400 scale-110'
+                          : 'text-slate-300'
+                      }`}
+                    />
+                  ))}
+                </div>
+
+                {/* Indicador de 2 Corazones por lección */}
+                <div className="flex items-center gap-0.5 bg-red-50 px-2 py-1 rounded-xl border border-red-200 shrink-0" title="2 vidas por lección">
+                  {[1, 2].map(heartNum => (
+                    <Heart
+                      key={heartNum}
+                      className={`w-4 h-4 transition-all ${
+                        lives >= heartNum
+                          ? 'text-red-500 fill-red-500'
+                          : 'text-slate-300'
+                      }`}
+                    />
+                  ))}
                 </div>
               </div>
 
-              {/* Encabezado limpio SIN el botón de Barajar opciones */}
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] font-extrabold uppercase px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800">
                   Lección {currentLessonNum}/{LESSONS_PER_SPECIALTY} • Pregunta {qIndex + 1} de {lessonQuestions.length}
+                </span>
+                <span className="text-[11px] font-bold text-slate-500">
+                  Aciertos: {correctCountInLesson}/10
                 </span>
               </div>
 
@@ -2271,9 +2376,16 @@ export default function App() {
                     : 'bg-red-50 border-red-500'
                 }`}
               >
-                <h4 className="font-extrabold text-base text-slate-900 mb-1">
-                  {feedbackState === 'correct' ? '✅ ¡Excelente respuesta!' : '❌ Respuesta incorrecta'}
-                </h4>
+                <div className="flex items-center justify-between mb-1">
+                  <h4 className="font-extrabold text-base text-slate-900">
+                    {feedbackState === 'correct' ? '✅ ¡Excelente respuesta!' : '❌ Respuesta incorrecta'}
+                  </h4>
+                  {feedbackState === 'wrong' && (
+                    <span className="text-xs font-extrabold text-red-600 bg-red-100 px-2 py-0.5 rounded-md">
+                      {lives > 0 ? '¡Cuidado! Te queda 1 ❤️' : '💔 Sin vidas (0/2)'}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-slate-700 mb-3">
                   {feedbackState === 'correct' ? currentQ.feedback_correct : currentQ.feedback_error}
                 </p>
@@ -2285,9 +2397,13 @@ export default function App() {
                 </div>
                 <button
                   onClick={handleNextQuestion}
-                  className="w-full py-3.5 rounded-2xl font-extrabold text-white text-sm uppercase bg-emerald-600 border-b-4 border-emerald-800"
+                  className={`w-full py-3.5 rounded-2xl font-extrabold text-white text-sm uppercase border-b-4 ${
+                    lives <= 0
+                      ? 'bg-red-600 border-red-800'
+                      : 'bg-emerald-600 border-emerald-800'
+                  }`}
                 >
-                  Continuar
+                  {lives <= 0 ? 'Ver resultado de la lección' : 'Continuar'}
                 </button>
               </div>
             )}
@@ -2295,87 +2411,140 @@ export default function App() {
         )}
 
         {/* ===================================================================== */}
-        {/* PANTALLA P5: RESUMEN DE LECCIÓN (AVANCE DE 1 A 10 LECCIONES)          */}
+        {/* PANTALLA P5: FIN DE LECCIÓN (APROBADA CON 3 ESTRELLAS O REINTENTAR)   */}
         {/* ===================================================================== */}
         {screen === 'P5' && (
-          <div className="p-6 flex flex-col justify-between text-center">
-            <div>
-              <div className="text-4xl mb-2">🌟🌟🌟</div>
-              <h2 className="text-2xl font-black text-slate-800">
-                ¡Lección {currentLessonNum} de {LESSONS_PER_SPECIALTY} Completada!
-              </h2>
-              <p className="text-xs text-emerald-700 font-bold mt-1">
-                Acertaste {correctCountInLesson} de {lessonQuestions.length} preguntas en esta sesión.
-              </p>
-
-              <div className="my-4 p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
-                <p className="text-xs font-extrabold text-emerald-900 mb-1">
-                  Avance hacia el Diploma de la Especialidad:
+          <div className="p-6 flex flex-col justify-between text-center min-h-[480px]">
+            {lessonResultType === 'approved' ? (
+              <div>
+                {/* 3 Estrellas Amarillas Encendidas */}
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  {[1, 2, 3].map(n => (
+                    <Star key={n} className="w-11 h-11 text-amber-400 fill-amber-400 drop-shadow" />
+                  ))}
+                </div>
+                <h2 className="text-2xl font-black text-slate-800">
+                  ¡Lección {currentLessonNum} Aprobada con 3 Estrellas!
+                </h2>
+                <p className="text-xs text-emerald-700 font-bold mt-1">
+                  Acertaste {correctCountInLesson} de {lessonQuestions.length} preguntas y conservaste tus vidas.
                 </p>
-                <div className="w-full h-3 bg-white rounded-full overflow-hidden border border-emerald-300 my-2">
-                  <div
-                    className="h-full bg-emerald-500 transition-all duration-300"
-                    style={{
-                      width: `${Math.min(100, ((lessonProgress[currentSpecId] || 0) / LESSONS_PER_SPECIALTY) * 100)}%`
-                    }}
-                  />
-                </div>
-                <p className="text-xs font-black text-emerald-700">
-                  {lessonProgress[currentSpecId] || 0} de {LESSONS_PER_SPECIALTY} lecciones aprobadas
-                </p>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3 my-4">
-                <div className="bg-white p-3 rounded-2xl border-2 border-emerald-200">
-                  <p className="text-xs font-bold text-slate-400 uppercase">XP Total</p>
-                  <p className="text-2xl font-black text-emerald-600">{xp} XP</p>
+                <div className="my-4 p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
+                  <p className="text-xs font-extrabold text-emerald-900 mb-1">
+                    Avance hacia el Diploma de la Especialidad:
+                  </p>
+                  <div className="w-full h-3 bg-white rounded-full overflow-hidden border border-emerald-300 my-2">
+                    <div
+                      className="h-full bg-emerald-500 transition-all duration-300"
+                      style={{
+                        width: `${Math.min(100, ((lessonProgress[currentSpecId] || 0) / LESSONS_PER_SPECIALTY) * 100)}%`
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs font-black text-emerald-700">
+                    {lessonProgress[currentSpecId] || 0} de {LESSONS_PER_SPECIALTY} lecciones aprobadas
+                  </p>
                 </div>
-                <div className="bg-white p-3 rounded-2xl border-2 border-amber-200">
-                  <p className="text-xs font-bold text-slate-400 uppercase">Jugador</p>
-                  <p className="text-base font-black text-amber-600 truncate">{userName}</p>
-                </div>
-              </div>
-            </div>
 
-            {isGuest ? (
-              <div className="space-y-2.5">
-                <button
-                  onClick={() => { setAuthView('register'); setScreen('P1'); }}
-                  className="w-full py-3.5 px-6 rounded-xl bg-[#259D4A] text-white font-extrabold text-sm uppercase"
-                >
-                  Crear mi cuenta y guardar mis {xp} XP
-                </button>
-                <button
-                  onClick={() => { setScreen('P2'); setActiveTab('ruta'); }}
-                  className="w-full py-3 px-6 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-xs uppercase"
-                >
-                  Volver a la Ruta
-                </button>
+                <div className="grid grid-cols-2 gap-3 my-4">
+                  <div className="bg-white p-3 rounded-2xl border-2 border-emerald-200">
+                    <p className="text-xs font-bold text-slate-400 uppercase">XP Total</p>
+                    <p className="text-2xl font-black text-emerald-600">{xp} XP</p>
+                  </div>
+                  <div className="bg-white p-3 rounded-2xl border-2 border-amber-200">
+                    <p className="text-xs font-bold text-slate-400 uppercase">Jugador</p>
+                    <p className="text-base font-black text-amber-600 truncate">{userName}</p>
+                  </div>
+                </div>
               </div>
             ) : (
-              <div className="space-y-2.5">
-                {(lessonProgress[currentSpecId] || 0) >= LESSONS_PER_SPECIALTY && (
-                  <button
-                    onClick={() => { setScreen('P2'); setActiveTab('diplomas'); }}
-                    className="w-full py-3.5 px-6 rounded-2xl bg-amber-500 border-b-4 border-amber-700 text-white font-extrabold text-sm uppercase flex items-center justify-center gap-2"
-                  >
-                    <Award className="w-4 h-4" /> ¡Ir a descargar mi Diploma!
-                  </button>
-                )}
-                <button
-                  onClick={() => { setScreen('P2'); setActiveTab('ruta'); }}
-                  className="w-full py-3.5 px-6 rounded-2xl bg-emerald-600 border-b-4 border-emerald-800 text-white font-extrabold text-sm uppercase"
-                >
-                  Continuar en la Ruta
-                </button>
+              <div>
+                {/* Pantalla de Reintento cuando comete 2 fallos (pierde sus 2 corazones) */}
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  {[1, 2, 3].map(n => (
+                    <Star
+                      key={n}
+                      className={`w-10 h-10 ${
+                        currentStarsEarned >= n ? 'text-amber-400 fill-amber-400' : 'text-slate-300'
+                      }`}
+                    />
+                  ))}
+                </div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-100 text-red-700 font-black text-xs mb-2">
+                  💔 Perdiste tus 2 corazones en la Lección {currentLessonNum}
+                </div>
+                <h2 className="text-2xl font-black text-slate-800">
+                  ¡A repetir la Lección {currentLessonNum}!
+                </h2>
+                <p className="text-xs text-slate-600 mt-1.5 max-w-xs mx-auto leading-relaxed">
+                  Para aprobar la lección necesitas acumular las <strong>3 estrellas amarillas (mínimo 9 de 10 aciertos)</strong> sin perder tus 2 corazones.
+                </p>
+
+                <div className="my-5 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-left text-xs text-amber-900 space-y-1">
+                  <p className="font-extrabold">📌 Resumen de tu intento:</p>
+                  <p>• Aciertos logrados: <strong>{correctCountInLesson} de 10</strong> ({currentStarsEarned} de 3 estrellas)</p>
+                  <p>• Tus lecciones anteriores ya aprobadas ({lessonProgress[currentSpecId] || 0}/{LESSONS_PER_SPECIALTY}) están a salvo.</p>
+                </div>
               </div>
             )}
+
+            <div className="space-y-2.5">
+              {lessonResultType !== 'approved' ? (
+                <>
+                  <button
+                    onClick={() => startSpecialtyLesson(currentSpecId)}
+                    className="w-full py-3.5 px-6 rounded-2xl bg-emerald-600 border-b-4 border-emerald-800 text-white font-extrabold text-sm uppercase flex items-center justify-center gap-2"
+                  >
+                    <RotateCcw className="w-4 h-4" /> Volver a intentar Lección {currentLessonNum}
+                  </button>
+                  <button
+                    onClick={() => { setScreen('P2'); setActiveTab('ruta'); }}
+                    className="w-full py-3 px-6 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-xs uppercase"
+                  >
+                    Volver a la Ruta
+                  </button>
+                </>
+              ) : isGuest ? (
+                <>
+                  <button
+                    onClick={() => { setAuthView('register'); setScreen('P1'); }}
+                    className="w-full py-3.5 px-6 rounded-xl bg-[#259D4A] text-white font-extrabold text-sm uppercase"
+                  >
+                    Crear mi cuenta y guardar mis {xp} XP
+                  </button>
+                  <button
+                    onClick={() => { setScreen('P2'); setActiveTab('ruta'); }}
+                    className="w-full py-3 px-6 rounded-xl bg-white border border-slate-300 text-slate-700 font-bold text-xs uppercase"
+                  >
+                    Volver a la Ruta
+                  </button>
+                </>
+              ) : (
+                <>
+                  {(lessonProgress[currentSpecId] || 0) >= LESSONS_PER_SPECIALTY && (
+                    <button
+                      onClick={() => { setScreen('P2'); setActiveTab('diplomas'); }}
+                      className="w-full py-3.5 px-6 rounded-2xl bg-amber-500 border-b-4 border-amber-700 text-white font-extrabold text-sm uppercase flex items-center justify-center gap-2"
+                    >
+                      <Award className="w-4 h-4" /> ¡Ir a descargar mi Diploma!
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { setScreen('P2'); setActiveTab('ruta'); }}
+                    className="w-full py-3.5 px-6 rounded-2xl bg-emerald-600 border-b-4 border-emerald-800 text-white font-extrabold text-sm uppercase"
+                  >
+                    Continuar con la siguiente lección
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>
 
       {/* ======================================================================= */}
-      {/* BANNER PUBLICITARIO INFERIOR FIJO (EL SCROLL PASA POR DETRÁS DEL BANNER)*/}
+      {/* BANNER PUBLICITARIO INFERIOR FIJO                                       */}
       {/* ======================================================================= */}
       <div className="fixed bottom-0 inset-x-0 z-50 flex justify-center pointer-events-none px-2 pb-1.5">
         <a
